@@ -1,3 +1,22 @@
+Added GCC support for RZ_A1H
+
+How to use
+==========
+
+* Install LINARO GNU Tools for ARM Embedded Processors
+
+  https://launchpad.net/gcc-arm-embedded
+
+* Create private_settings.py in workspace_tools foloder and set GCC_ARM_PATH
+
+  GCC_ARM_PATH = "~/gcc-arm-embedded/bin"
+
+* Execute build command for libmbed.a and mbed_blinky.bin (-p 25)
+
+  python workspace_tools/build.py -c -m RZ_A1H -t GCC_ARM
+
+  python workspace_tools/make.py -c -m RZ_A1H -t GCC_ARM -p 25
+
 mbed SDK
 ========
 
