@@ -65,8 +65,13 @@
 
 #include <stdint.h>
 #include "MBRZA1H.h"
+#if defined(__GNUC__)
+#include "core_ca_mmu.h"
+#endif
 
+#if defined(__ARMCC_VERSION)
 //Import symbols from linker
+
 extern uint32_t Image$$VECTORS$$Base;
 extern uint32_t Image$$RO_DATA$$Base;
 extern uint32_t Image$$RW_DATA$$Base;
@@ -78,10 +83,43 @@ extern uint32_t Image$$RO_DATA$$Limit;
 extern uint32_t Image$$RW_DATA$$Limit;
 extern uint32_t Image$$ZI_DATA$$Limit;
 
-#define	VECTORS_SIZE	(((uint32_t)&Image$$VECTORS$$Limit >> 20) - ((uint32_t)&Image$$VECTORS$$Base >> 20) + 1)
-#define	RO_DATA_SIZE	(((uint32_t)&Image$$RO_DATA$$Limit >> 20) - ((uint32_t)&Image$$RO_DATA$$Base >> 20) + 1)
-#define	RW_DATA_SIZE	(((uint32_t)&Image$$RW_DATA$$Limit >> 20) - ((uint32_t)&Image$$RW_DATA$$Base >> 20) + 1)
-#define	ZI_DATA_SIZE	(((uint32_t)&Image$$ZI_DATA$$Limit >> 20) - ((uint32_t)&Image$$ZI_DATA$$Base >> 20) + 1)
+#define VECTORS_SIZE    (((uint32_t)&Image$$VECTORS$$Limit >> 20) - ((uint32_t)&Image$$VECTORS$$Base >> 20) + 1)
+#define RO_DATA_SIZE    (((uint32_t)&Image$$RO_DATA$$Limit >> 20) - ((uint32_t)&Image$$RO_DATA$$Base >> 20) + 1)
+#define RW_DATA_SIZE    (((uint32_t)&Image$$RW_DATA$$Limit >> 20) - ((uint32_t)&Image$$RW_DATA$$Base >> 20) + 1)
+#define ZI_DATA_SIZE    (((uint32_t)&Image$$ZI_DATA$$Limit >> 20) - ((uint32_t)&Image$$ZI_DATA$$Base >> 20) + 1)
+
+#elif defined(__GNUC__)
+__STATIC_INLINE void __set_TTBR0(uint32_t ttbr0) {
+    //register uint32_t __regTTBR0        __ASM("cp15:0:c2:c0:0");
+    //__regTTBR0 = ttbr0;
+    __asm__ __volatile__ ("STR  r0, %0" : "=m" (ttbr0) : );
+    __asm__ __volatile__ ("MCR  p15,#0x0,r0,c2,c0,#0");
+    __ISB();
+}
+
+__STATIC_INLINE void __set_DACR(uint32_t dacr) {
+    //register uint32_t __regDACR         __ASM("cp15:0:c3:c0:0");
+    //__regDACR = dacr;
+    __asm__ __volatile__ ("STR  r0, %0" : "=m" (dacr) : );
+    __asm__ __volatile__ ("MCR  p15,#0x0,r0,c3,c0,#0");
+    __ISB();
+}
+
+#define Image__TTB__ZI__Base    ((uint32_t *)0x20000000)
+#define Image__VECTORS__Base    0x18004000
+#define Image__VECTORS__Limit   0x18001000
+#define Image__RO_DATA__Base    0x18005000
+#define Image__RO_DATA__Limit   0x18100000
+#define Image__RW_DATA__Base    0x20600000
+#define Image__RW_DATA__Limit   0x20610000
+#define Image__ZI_DATA__Base    0x20100000
+#define Image__ZI_DATA__Limit   0x20200000
+
+#define VECTORS_SIZE    (((uint32_t)Image__VECTORS__Limit >> 20) - ((uint32_t)Image__VECTORS__Base >> 20) + 1)
+#define RO_DATA_SIZE    (((uint32_t)Image__RO_DATA__Limit >> 20) - ((uint32_t)Image__RO_DATA__Base >> 20) + 1)
+#define RW_DATA_SIZE    (((uint32_t)Image__RW_DATA__Limit >> 20) - ((uint32_t)Image__RW_DATA__Base >> 20) + 1)
+#define ZI_DATA_SIZE    (((uint32_t)Image__ZI_DATA__Limit >> 20) - ((uint32_t)Image__ZI_DATA__Base >> 20) + 1)
+#endif
 
 static uint32_t Sect_Normal;     //outer & inner wb/wa, non-shareable, executable, rw, domain 0, base addr 0
 static uint32_t Sect_Normal_NC;  //non-shareable, non-executable, rw, domain 0, base addr 0
@@ -124,6 +162,7 @@ void create_translation_table(void)
      *
      */
 
+#if defined(__ARMCC_VERSION)
     //Create 4GB of faulting entries
     __TTSection (&Image$$TTB$$ZI$$Base, 0, 4096, DESCRIPTOR_FAULT);
 
@@ -147,7 +186,36 @@ void create_translation_table(void)
     __TTSection (&Image$$TTB$$ZI$$Base, (uint32_t)&Image$$VECTORS$$Base, VECTORS_SIZE, Sect_Normal_Cod);
     __TTSection (&Image$$TTB$$ZI$$Base, (uint32_t)&Image$$RW_DATA$$Base, RW_DATA_SIZE, Sect_Normal_RW);
     __TTSection (&Image$$TTB$$ZI$$Base, (uint32_t)&Image$$ZI_DATA$$Base, ZI_DATA_SIZE, Sect_Normal_RW);
+
     __TTSection (&Image$$TTB$$ZI$$Base, Renesas_RZ_A1_ONCHIP_SRAM_NC_BASE,         10, Sect_Normal_NC);
+
+#elif defined(__GNUC__)
+    //Create 4GB of faulting entries
+    __TTSection (Image__TTB__ZI__Base, 0, 4096, DESCRIPTOR_FAULT);
+
+    // R7S72100 memory map.
+    __TTSection (Image__TTB__ZI__Base, Renesas_RZ_A1_NORFLASH_BASE0    , 64, Sect_Normal_RO);
+    __TTSection (Image__TTB__ZI__Base, Renesas_RZ_A1_NORFLASH_BASE1    , 64, Sect_Normal_RO);
+    __TTSection (Image__TTB__ZI__Base, Renesas_RZ_A1_SDRAM_BASE0       , 64, Sect_Normal_RW);
+    __TTSection (Image__TTB__ZI__Base, Renesas_RZ_A1_SDRAM_BASE1       , 64, Sect_Normal_RW);
+    __TTSection (Image__TTB__ZI__Base, Renesas_RZ_A1_USER_AREA0        , 64, Sect_Normal_RW);
+    __TTSection (Image__TTB__ZI__Base, Renesas_RZ_A1_USER_AREA1        , 64, Sect_Normal_RW);
+    __TTSection (Image__TTB__ZI__Base, Renesas_RZ_A1_SPI_IO0           , 64, Sect_Normal_RO);
+    __TTSection (Image__TTB__ZI__Base, Renesas_RZ_A1_SPI_IO1           , 64, Sect_Normal_RO);
+    __TTSection (Image__TTB__ZI__Base, Renesas_RZ_A1_ONCHIP_SRAM_BASE  , 10, Sect_Normal_RW);
+    __TTSection (Image__TTB__ZI__Base, Renesas_RZ_A1_SPI_MIO_BASE      ,  1, Sect_Device_RW);
+    __TTSection (Image__TTB__ZI__Base, Renesas_RZ_A1_BSC_BASE          ,  1, Sect_Device_RW);
+    __TTSection (Image__TTB__ZI__Base, Renesas_RZ_A1_PERIPH_BASE0      ,  3, Sect_Device_RW);
+    __TTSection (Image__TTB__ZI__Base, Renesas_RZ_A1_PERIPH_BASE1      , 49, Sect_Device_RW);
+
+    //Define Image
+    __TTSection (Image__TTB__ZI__Base, (uint32_t)Image__RO_DATA__Base, RO_DATA_SIZE, Sect_Normal_RO);
+    __TTSection (Image__TTB__ZI__Base, (uint32_t)Image__VECTORS__Base, VECTORS_SIZE, Sect_Normal_Cod);
+    __TTSection (Image__TTB__ZI__Base, (uint32_t)Image__RW_DATA__Base, RW_DATA_SIZE, Sect_Normal_RW);
+    __TTSection (Image__TTB__ZI__Base, (uint32_t)Image__ZI_DATA__Base, ZI_DATA_SIZE, Sect_Normal_RW);
+
+    __TTSection (Image__TTB__ZI__Base, Renesas_RZ_A1_ONCHIP_SRAM_NC_BASE,         10, Sect_Normal_NC);
+ #endif
 
     /* Set location of level 1 page table
     ; 31:14 - Translation table base addr (31:14-TTBCR.N, TTBCR.N is 0 out of reset)
@@ -158,14 +226,17 @@ void create_translation_table(void)
     ; 2     - IMP     0x0 (Implementation Defined)
     ; 1     - S       0x0 (Non-shared)
     ; 0     - IRGN[1] 0x1 (Inner WB WA) */
-    __set_TTBR0(((uint32_t)&Image$$TTB$$ZI$$Base) | 9);
 
+#if defined(__ARMCC_VERSION)
+    __set_TTBR0(((uint32_t)&Image$$TTB$$ZI$$Base) | 9);
+#elif defined(__GNUC__)
+    __set_TTBR0(((uint32_t)Image__TTB__ZI__Base) | 9);
+#endif
     /* Set up domain access control register
     ; We set domain 0 to Client and all other domains to No Access.
     ; All translation table entries specify domain 0 */
     __set_DACR(1);
 }
-
 
 /*----------------------------------------------------------------------------
  * end of file

@@ -470,7 +470,11 @@ extern "C" caddr_t _sbrk(int incr) {
 #if defined(TARGET_ARM7)
     if (new_heap >= stack_ptr) {
 #else
+#if defined(__ARMCC_VERSION)
     if (new_heap >= (unsigned char*)__get_MSP()) {
+#else
+    if (new_heap >= stack_ptr) {
+#endif
 #endif
         errno = ENOMEM;
         return (caddr_t)-1;

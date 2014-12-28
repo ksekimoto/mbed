@@ -1,13 +1,13 @@
-/* Linker script for mbed LPC1768 */
+/* Linker script for mbed RZ_A1H */
 
 /* Linker script to configure memory regions. */
 MEMORY
 {
-  FLASH (rx) : ORIGIN = 0x20000000, LENGTH = 512K
-  RAM (rwx) : ORIGIN = 0x20080000, LENGTH = (1M)
-
-  USB_RAM(rwx) : ORIGIN = 0x20180000, LENGTH = 16K
-  ETH_RAM(rwx) : ORIGIN = 0x20280000, LENGTH = 16K
+  BOOT_LOADER (rx) : ORIGIN = 0x18000000, LENGTH = 0x00004000
+  SFLASH (rx) : ORIGIN = 0x18004000, LENGTH = 0x07FFC000
+  RAM0 (rwx) : ORIGIN = 0x20600000, LENGTH = (1M)
+  RAM1 (rwx) : ORIGIN = 0x20100000, LENGTH = (1M)
+  HEAP (rwx) : ORIGIN = 0x20200000, LENGTH = (1M)
 }
 
 /* Linker script to place sections and symbol values. Should be used together
@@ -40,6 +40,11 @@ ENTRY(Reset_Handler)
 
 SECTIONS
 {
+    .boot :
+    {
+        KEEP(*(.boot_loader))
+    } > BOOT_LOADER
+    
     .text :
     {
         KEEP(*(.isr_vector))
@@ -65,18 +70,18 @@ SECTIONS
         *(.rodata*)
 
         KEEP(*(.eh_frame*))
-    } > FLASH
+    } > SFLASH
 
     .ARM.extab : 
     {
         *(.ARM.extab* .gnu.linkonce.armextab.*)
-    } > FLASH
+    } > SFLASH
 
     __exidx_start = .;
     .ARM.exidx :
     {
         *(.ARM.exidx* .gnu.linkonce.armexidx.*)
-    } > FLASH
+    } > SFLASH
     __exidx_end = .;
 
     __etext = .;
@@ -113,7 +118,7 @@ SECTIONS
         /* All data end */
         __data_end__ = .;
 
-    } > RAM
+    } > RAM0
 
     
     .bss :
@@ -123,7 +128,7 @@ SECTIONS
         *(COMMON)
         __bss_end__ = .;
         Image$$RW_RAM1$$ZI$$Limit = . ;
-    } > RAM
+    } > RAM1
 
     
     .heap :
@@ -132,7 +137,7 @@ SECTIONS
         end = __end__;
         *(.heap*)
         __HeapLimit = .;
-    } > RAM
+    } > HEAP
 
     /* .stack_dummy section doesn't contains any symbols. It is only
      * used for linker to calculate size of stack sections, and assign
@@ -140,16 +145,16 @@ SECTIONS
     .stack_dummy :
     {
         *(.stack)
-    } > RAM
+    } > RAM1
 
     /* Set stack top to end of RAM, and stack limit move down by
      * size of stack_dummy section */
-    __StackTop = ORIGIN(RAM) + LENGTH(RAM);
+    __StackTop = ORIGIN(RAM1) + LENGTH(RAM1);
     __StackLimit = __StackTop - SIZEOF(.stack_dummy);
     PROVIDE(__stack = __StackTop);
     
     /* Check if data + heap + stack exceeds RAM limit */
-    ASSERT(__StackLimit >= __HeapLimit, "region RAM overflowed with stack")
+    /* ASSERT(__StackLimit >= __HeapLimit, "region RAM overflowed with stack") */
 
 
 }

@@ -77,7 +77,7 @@ uint32_t us_ticker_read() {
     val64 = ((uint64_t)wrap_arround << 32) + val;
 
     /* clock to us */
-    val = (uint32_t)(val64 / count_clock);
+    val = (uint32_t)((double)val64 / (double)count_clock);
     return val;
 }
 

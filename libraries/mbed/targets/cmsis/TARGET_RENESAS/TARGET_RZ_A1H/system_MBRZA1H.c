@@ -40,13 +40,20 @@
 #include "MBRZA1H.h"
 #include "RZ_A1_Init.h"
 
-
+#if defined(__ARMCC_VERSION)
 extern void $Super$$main(void);
 __asm void FPUEnable(void);
+#else
+void FPUEnable(void);
+static inline void __enable_irq(void)
+{
+    __asm__("cpsie i");
+}
+#endif
 
 uint32_t IRQNestLevel;
 
-
+#if defined(__ARMCC_VERSION)
 /**
  * Initialize the cache.
  *
@@ -91,6 +98,203 @@ void InitMemorySubsystem(void) {
     }
 }
 #pragma pop
+
+#elif defined(__GNUC__)
+void __v7_all_cache(uint32_t op)
+{
+    __asm__ __volatile__ (
+            ".align 2                       \n\t"
+            ".arm                           \n\t"
+            "push   {r4-r11}                \n\t"
+            "mrc    p15, 1, r6, c0, c0, 1   \n\t"
+            "ands   r3, r6, #0x07000000     \n\t"
+            "mov    r3, r3, lsr #23         \n\t"
+            "beq    finished                \n\t"
+            "mov    r10, #0                 \n\t"
+            "loop1:                         \n\t"
+            "add    r2, r10, r10, lsr #1    \n\t"
+            "mov    r1, r6, lsr r2          \n\t"
+            "and    r1, r1, #7              \n\t"
+            "cmp    r1, #2                  \n\t"
+            "blt    skip                    \n\t"
+            "mcr    p15, 2, r10, c0, c0, 0  \n\t"
+            "isb                            \n\t"
+            "mrc    p15, 1, r1, c0, c0, 0   \n\t"
+            "and    r2, r1, #7              \n\t"
+            "add    r2, r2, #4              \n\t"
+            "ldr    r4, =0x3ff              \n\t"
+            "ands   r4, r4, r1, lsr #3      \n\t"
+            "clz    r5, r4                  \n\t"
+            "ldr    r7, =0x7fff             \n\t"
+            "ands   r7, r7, r1, lsr #13     \n\t"
+            "loop2:                         \n\t"
+            "mov    r9, r4                  \n\t"
+            "loop3:                         \n\t"
+            "orr    r11, r10, r9, lsl r5    \n\t"
+            "orr    r11, r11, r7, lsl r2    \n\t"
+            "cmp    r0, #0                  \n\t"
+            "bne    dccsw                   \n\t"
+            "mcr    p15, 0, r11, c7, c6, 2  \n\t"
+            "b      cont                    \n\t"
+            "dccsw:                         \n\t"
+            "cmp    r0, #1                  \n\t"
+            "bne    dccisw                  \n\t"
+            "mcr    p15, 0, r11, c7, c10, 2 \n\t"
+            "b      cont                    \n\t"
+            "dccisw:                        \n\t"
+            "mcr    p15, 0, r11, c7, c14, 2 \n\t"
+            "cont:                          \n\t"
+            "subs   r9, r9, #1              \n\t"
+            "bge    loop3                   \n\t"
+            "subs   r7, r7, #1              \n\t"
+            "bge    loop2                   \n\t"
+            "skip:                          \n\t"
+            "add    r10, r10, #2            \n\t"
+            "cmp    r3, r10                 \n\t"
+            "bgt    loop1                   \n\t"
+            "finished:                      \n\t"
+            "dsb                            \n\t"
+            "pop    {r4-r11}                \n\t"
+            "bx     lr                      \n\t"
+    );
+}
+
+#ifdef __set_SCTLR
+#undef __set_SCTLR
+#endif
+__attribute__((always_inline)) __STATIC_INLINE void __set_SCTLR(uint32_t sctlr)
+{
+    //register uint32_t __regSCTLR         __ASM("cp15:0:c1:c0:0");
+    //__regSCTLR = sctlr;
+    __asm__ __volatile__ ("str  r0, %0" : "=m" (sctlr) : );
+    __asm__ __volatile__ ("mcr  p15,#0x0,r0,c1,c0,#0");
+}
+
+#ifdef __get_SCTLR
+#undef __get_SCTLR
+#endif
+__attribute__((always_inline)) __STATIC_INLINE uint32_t __get_SCTLR()
+{
+    //register uint32_t __regSCTLR         __ASM("cp15:0:c1:c0:0");
+    //return(__regSCTLR);
+    uint32_t sctlr;
+    __asm__ __volatile__ ("mrc  p15,#0x0,r0,c1,c0,#0");
+    __asm__ __volatile__ ("ldr  r0, %0" : : "m" (sctlr));
+    return sctlr;
+}
+
+#ifdef __ca9u_inv_tlb_all
+#undef __ca9u_inv_tlb_all
+#endif
+__attribute__((always_inline)) __STATIC_INLINE void __ca9u_inv_tlb_all()
+{
+    //register uint32_t __TLBIALL         __ASM("cp15:0:c8:c7:0");
+    //__TLBIALL = 0;
+    __asm__ __volatile__ ("mov  r0, #0");
+    __asm__ __volatile__ ("mcr  p15,#0x0,r0,c8,c7,#0");
+    __DSB();
+    __ISB();
+}
+
+#ifdef __v7_inv_icache_all
+#undef __v7_inv_icache_all
+#endif
+__attribute__((always_inline)) __STATIC_INLINE void __v7_inv_icache_all()
+{
+    //register uint32_t __ICIALLU         __ASM("cp15:0:c7:c5:0");
+    //__ICIALLU = 0;
+    __asm__ __volatile__ ("mov  r0, #0");
+    __asm__ __volatile__ ("mcr  p15,#0x0,r0,c7,c5,#0");
+    __DSB();     //ensure completion of the invalidation
+    __ISB();     //ensure instruction fetch path sees new I cache state
+}
+
+#ifdef __v7_inv_dcache_all
+#undef __v7_inv_dcache_all
+#endif
+__attribute__((always_inline)) __STATIC_INLINE void __v7_inv_dcache_all(void) {
+    __v7_all_cache(0);
+}
+
+#ifdef __v7_inv_btac
+#undef __v7_inv_btac
+#endif
+__attribute__((always_inline)) __STATIC_INLINE void __v7_inv_btac()
+{
+    //register uint32_t __BPIALL          __ASM("cp15:0:c7:c5:6");
+    //__BPIALL  = 0;
+    __asm__ __volatile__ ("mov  r0, #0");
+    __asm__ __volatile__ ("mcr  p15,#0x0,r0,c7,c5,#6");
+    __DSB();     //ensure completion of the invalidation
+    __ISB();     //ensure instruction fetch path sees new state
+}
+
+#ifdef __enable_mmu
+#undef __enable_mmu
+#endif
+__attribute__((always_inline)) __STATIC_INLINE void __enable_mmu()
+{
+    // Set M bit 0 to enable the MMU
+    // Set AFE bit to enable simplified access permissions model
+    // Clear TRE bit to disable TEX remap and A bit to disable strict alignment fault checking
+    __set_SCTLR( (__get_SCTLR() & ~(1 << 28) & ~(1 << 1)) | 1 | (1 << 29));
+    __ISB();
+}
+
+#ifdef  __enable_caches
+#undef  __enable_caches
+#endif
+__attribute__((always_inline)) __STATIC_INLINE void __enable_caches()
+{
+    // Set I bit 12 to enable I Cache
+    // Set C bit  2 to enable D Cache
+    __set_SCTLR( __get_SCTLR() | (1 << 12) | (1 << 2));
+}
+
+#ifdef __enable_btac
+#undef __enable_btac
+#endif
+__attribute__((always_inline)) __STATIC_INLINE void __enable_btac()
+{
+    __set_SCTLR( __get_SCTLR() | (1 << 11));
+    __ISB();
+}
+
+void InitMemorySubsystem(void) {
+
+    /* This SVC is specific for reset where data / tlb / btac may contain undefined data, therefore before
+     * enabling the cache you must invalidate the instruction cache, the data cache, TLB, and BTAC.
+     * You are not required to invalidate the main TLB, even though it is recommended for safety
+     * reasons. This ensures compatibility with future revisions of the processor. */
+
+    unsigned int l2_id;
+
+    /* Invalidate undefined data */
+    __ca9u_inv_tlb_all();
+    __v7_inv_icache_all();
+    __v7_inv_dcache_all();
+    __v7_inv_btac();
+
+    /* Don't use this function during runtime since caches may contain valid data. For a correct cache maintenance you may need to execute a clean and
+     * invalidate in order to flush the valid data to the next level cache.
+     */
+    __enable_mmu();
+
+    /* After MMU is enabled and data has been invalidated, enable caches and BTAC */
+    __enable_caches();
+    __enable_btac();
+
+    /* If present, you may also need to Invalidate and Enable L2 cache here */
+    l2_id = PL310_GetID();
+    if (l2_id)
+    {
+       PL310_InvAllByWay();
+       PL310_Enable();
+    }
+}
+#else
+
+#endif
 
 IRQHandler IRQTable[Renesas_RZ_A1_IRQ_MAX+1];
 
@@ -237,8 +441,8 @@ void CPAbtHandler(uint32_t IFSR, uint32_t IFAR, uint32_t LR) {
 //this will be 2 when we have performed some maintenance and want to retry the instruction in thumb (state == 2)
 //this will be 4 when we have performed some maintenance and want to retry the instruction in arm (state == 4)
 uint32_t CUndefHandler(uint32_t opcode, uint32_t state, uint32_t LR) {
-    const int THUMB = 2;
-    const int ARM = 4;
+    const unsigned int THUMB = 2;
+    const unsigned int ARM = 4;
     //Lazy VFP/NEON initialisation and switching
     if ((state == ARM   && ((opcode & 0x0C000000)) >> 26 == 0x03) ||
         (state == THUMB && ((opcode & 0xEC000000)) >> 26 == 0x3B)) {
@@ -252,8 +456,10 @@ uint32_t CUndefHandler(uint32_t opcode, uint32_t state, uint32_t LR) {
     while(1);
 }
 
+#if defined(__ARMCC_VERSION)
 #pragma push
 #pragma arm
+
 //Critical section, called from undef handler, so systick is disabled
 __asm void FPUEnable(void) {
         ARM
@@ -296,3 +502,41 @@ __asm void FPUEnable(void) {
         BX      LR
 }
 #pragma pop
+#elif defined(__GNUC__)
+void FPUEnable(void)
+{
+    __asm__ __volatile__ (
+            ".align 2                   \n\t"
+            ".arm                       \n\t"
+            "mrc    p15,0,r1,c1,c0,2    \n\t"
+            "orr    r1,r1,#0x00f00000   \n\t"
+            "mcr    p15,0,r1,c1,c0,2    \n\t"
+            "vmrs   r1,fpexc            \n\t"
+            "orr    r1,r1,#0x40000000   \n\t"
+            "vmsr   fpexc,r1            \n\t"
+            "mov    r2,#0               \n\t"
+            "vmov   d0, r2,r2           \n\t"
+            "vmov   d1, r2,r2           \n\t"
+            "vmov   d2, r2,r2           \n\t"
+            "vmov   d3, r2,r2           \n\t"
+            "vmov   d4, r2,r2           \n\t"
+            "vmov   d5, r2,r2           \n\t"
+            "vmov   d6, r2,r2           \n\t"
+            "vmov   d7, r2,r2           \n\t"
+            "vmov   d8, r2,r2           \n\t"
+            "vmov   d9, r2,r2           \n\t"
+            "vmov   d10,r2,r2           \n\t"
+            "vmov   d11,r2,r2           \n\t"
+            "vmov   d12,r2,r2           \n\t"
+            "vmov   d13,r2,r2           \n\t"
+            "vmov   d14,r2,r2           \n\t"
+            "vmov   d15,r2,r2           \n\t"
+            "vmrs   r2,fpscr            \n\t"
+            "ldr    r3,=0x00086060      \n\t"
+            "and    r2,r2,r3            \n\t"
+            "vmsr   fpscr,r2            \n\t"
+            "bx     lr                  \n\t"
+    );
+}
+#else
+#endif

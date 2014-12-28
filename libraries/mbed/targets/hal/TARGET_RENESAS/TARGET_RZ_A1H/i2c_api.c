@@ -23,6 +23,12 @@
 #include "RZ_A1_Init.h"
 #include "MBRZA1H.h"
 
+#if defined(__ARMCC_VERSION)
+#define FLOAT64_T   float64_t
+#elif defined(__GNUC__)
+#define FLOAT64_T   float
+#endif
+
 volatile struct st_riic *RIIC[] = RIIC_ADDRESS_LIST;
 
 #define REG(N) \
@@ -292,11 +298,11 @@ static inline int i2c_do_read(i2c_t *obj, int last) {
 }
 
 void i2c_frequency(i2c_t *obj, int hz) {
-    float64_t pclk_val;
-    float64_t wait_utime;
-    volatile float64_t bps;
-    volatile float64_t L_time;         /* H Width period */
-    volatile float64_t H_time;         /* L Width period */
+    FLOAT64_T pclk_val;
+    FLOAT64_T wait_utime;
+    volatile FLOAT64_T bps;
+    volatile FLOAT64_T L_time;         /* H Width period */
+    volatile FLOAT64_T H_time;         /* L Width period */
     uint32_t tmp_L_width;
     uint32_t tmp_H_width;
     uint32_t remainder;
@@ -304,9 +310,9 @@ void i2c_frequency(i2c_t *obj, int hz) {
 
     /* set PCLK */
     if (false == RZ_A1_IsClockMode0()) {
-        pclk_val = (float64_t)CM1_RENESAS_RZ_A1_P0_CLK;
+        pclk_val = (FLOAT64_T)CM1_RENESAS_RZ_A1_P0_CLK;
     } else {
-        pclk_val = (float64_t)CM0_RENESAS_RZ_A1_P0_CLK;
+        pclk_val = (FLOAT64_T)CM0_RENESAS_RZ_A1_P0_CLK;
     }
 
     /* Min 10kHz, Max 400kHz */
@@ -315,7 +321,7 @@ void i2c_frequency(i2c_t *obj, int hz) {
     } else if (hz > 400000) {
         bps = 400000;
     } else {
-        bps = (float64_t)hz;
+        bps = (FLOAT64_T)hz;
     }
 
     /* Calculation L width time */

@@ -41,7 +41,13 @@ class GCC(mbedToolchain):
             cpu = target.core.lower()
 
         self.cpu = ["-mcpu=%s" % cpu]
-        if target.core.startswith("Cortex"):
+
+        if target.core == "Cortex-A9":
+            # self.cpu.append("-mthumb")
+            self.cpu.append("-march=armv7-a")
+            self.cpu.append("-mfpu=neon")
+            self.cpu.append("-mfloat-abi=softfp")
+       	elif target.core.startswith("Cortex"):
             self.cpu.append("-mthumb")
 
         if target.core == "Cortex-M4F":
@@ -174,6 +180,7 @@ class GCC_ARM(GCC):
         GCC.__init__(self, target, options, notify, macros, silent, GCC_ARM_PATH)
 
         # Use latest gcc nanolib
+        # if target.core != "Cortex-A9":
         self.ld.append("--specs=nano.specs")
         if target.name in ["LPC1768", "LPC4088", "LPC4330", "UBLOX_C027", "LPC2368"]:
             self.ld.extend(["-u _printf_float", "-u _scanf_float"])
@@ -192,6 +199,7 @@ class GCC_CR(GCC):
         self.cppc += additional_compiler_flags
 
         # Use latest gcc nanolib
+        # if target.core != "Cortex-A9":
         self.ld.append("--specs=nano.specs")
         if target.name in ["LPC1768", "LPC4088", "LPC4330", "UBLOX_C027", "LPC2368"]:
             self.ld.extend(["-u _printf_float", "-u _scanf_float"])
