@@ -132,7 +132,3 @@ For every topic regarding the use of the mbed SDK, rather than its development, 
 
 For reporting issues in the mbed libraries please open a ticket on the issue tracker of the relevant [mbed official library](http://mbed.org/users/mbed_official/code/).
 
-<<<<<<< HEAD
-20150628 Dummy update for testing
-=======
->>>>>>> f9890541f456dfb1f07871a8dba1d5a4bc8c5429
