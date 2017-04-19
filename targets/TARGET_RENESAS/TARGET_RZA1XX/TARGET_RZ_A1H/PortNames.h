@@ -1,5 +1,5 @@
 /* mbed Microcontroller Library
- * Copyright (c) 2016 ARM Limited
+ * Copyright (c) 2006-2013 ARM Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,13 +13,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#ifndef MBED_MBED_RTX_H
-#define MBED_MBED_RTX_H
+#ifndef MBED_PORTNAMES_H
+#define MBED_PORTNAMES_H
 
-#if defined(TARGET_RZ_A1H) || defined(TARGET_VK_RZ_A1H) || defined(TARGET_GR_LYCHEE)
-#ifndef OS_CLOCK
-#define OS_CLOCK         12000000
-#endif
+#ifdef __cplusplus
+extern "C" {
 #endif
 
-#endif  // MBED_MBED_RTX_H
+typedef enum {
+    Port0 = 0,
+    Port1 = 1,
+    Port2 = 2,
+    Port3 = 3,
+    Port4 = 4,
+    Port5 = 5,
+    Port6 = 6,
+    Port7 = 7,
+    Port8 = 8,
+    Port9 = 9,
+    Port10 = 10,
+    Port11 = 11
+} PortName;
+
+#ifdef __cplusplus
+}
+#endif
+#endif

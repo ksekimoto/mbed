@@ -250,7 +250,7 @@ void os_idle_demon (void) {
 #if (OS_SYSTICK == 0)   // Functions for alternative timer as RTX kernel timer
 
 /*--------------------------- os_tick_init ----------------------------------*/
-#if defined(TARGET_RZ_A1H) || defined(TARGET_VK_RZ_A1H)
+#if defined(TARGET_RZ_A1H) || defined(TARGET_VK_RZ_A1H) || defined(TARGET_GR_LYCHEE)
 #define OSTM0   (0xFCFEC000uL) /* OSTM0 */
 #define OSTM1   (0xFCFEC400uL) /* OSTM1 */
 #define CPG     (0xFCFE0410uL) /* CPG */
@@ -275,6 +275,12 @@ void os_idle_demon (void) {
 #define CM1_RENESAS_RZ_A1_P0_CLK ( 32000000u)
 #define CM0_RENESAS_RZ_A1_P0_CLK ( 33333333u)
 
+#if defined(TARGET_RZ_A1H) || defined(TARGET_VK_RZ_A1H)
+#define RZ_A1_P0_CLK            CM0_RENESAS_RZ_A1_P0_CLK
+#elif defined(TARGET_GR_LYCHEE)
+#define RZ_A1_P0_CLK            CM1_RENESAS_RZ_A1_P0_CLK
+#endif
+
 typedef enum
 {
     IRQ_SGI0       = 0,
@@ -291,7 +297,7 @@ extern uint32_t InterruptHandlerRegister (IRQn_Type irq, IRQHandler handler);
 /// \brief Initializes an alternative hardware timer as RTX kernel timer
 /// \return                             IRQ number of the alternative hardware timer
 int os_tick_init (void) {
-#if defined(TARGET_RZ_A1H) || defined(TARGET_VK_RZ_A1H)
+#if defined(TARGET_RZ_A1H) || defined(TARGET_VK_RZ_A1H) || defined(TARGET_GR_LYCHEE)
   CPGSTBCR5 &= ~(CPG_STBCR5_BIT_MSTP51); /* enable OSTM0 clock */
 
   OSTM0TT   = 0x1;    /* Stop the counter and clears the OSTM0TE bit.     */
