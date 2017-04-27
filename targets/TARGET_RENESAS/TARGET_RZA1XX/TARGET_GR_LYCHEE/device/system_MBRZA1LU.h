@@ -36,8 +36,8 @@
    ---------------------------------------------------------------------------*/
 
 
-#ifndef __SYSTEM_MBRZA1H
-#define __SYSTEM_MBRZA1H
+#ifndef __SYSTEM_MBRZA1LU
+#define __SYSTEM_MBRZA1LU
 
 #ifdef __cplusplus
 extern "C" {
@@ -64,4 +64,4 @@ extern void SystemInit (void);
 }
 #endif
 
-#endif /* __SYSTEM_MBRZA1H */
+#endif /* __SYSTEM_MBRZA1LU */

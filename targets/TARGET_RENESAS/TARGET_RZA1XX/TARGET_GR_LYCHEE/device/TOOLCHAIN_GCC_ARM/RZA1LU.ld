@@ -1,4 +1,4 @@
-/* Linker script for mbed RZ_A1H */
+/* Linker script for mbed RZ_A1LU */
 
 /* Linker script to configure memory regions. */
 MEMORY

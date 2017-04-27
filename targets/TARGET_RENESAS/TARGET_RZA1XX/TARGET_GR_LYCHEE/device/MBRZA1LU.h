@@ -23,7 +23,7 @@
 /**************************************************************************//**
  * @file     MBRZA1LU.h
  * @brief    CMSIS Cortex-A9 Core Peripheral Access Layer Header File for 
- *           Renesas MBRZA1H Device Series
+ *           Renesas MBRZA1LU Device Series
  * @version
  * @date     19 Sept 2013
  *
@@ -31,8 +31,8 @@
  *
  ******************************************************************************/
 
-#ifndef __MBRZA1H_H__
-#define __MBRZA1H_H__
+#ifndef __MBRZA1LU_H__
+#define __MBRZA1LU_H__
 
 #ifdef __cplusplus
 extern "C" {
@@ -1056,4 +1056,4 @@ typedef enum IRQn
 }
 #endif
 
-#endif  // __MBRZA1H_H__
+#endif  // __MBRZA1LU_H__

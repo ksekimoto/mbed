@@ -1,7 +1,7 @@
 ;/*****************************************************************************
-; * @file:    startup_MBRZA1H.s
+; * @file:    startup_MBRZA1LU.s
 ; * @purpose: CMSIS Cortex-A9 Core Device Startup File 
-; *           for the NXP MBRZA1H Device Series 
+; *           for the NXP MBRZA1LU Device Series 
 ; * @version: V1.02, modified for mbed
 ; * @date:    27. July 2009, modified 3rd Aug 2009
 ; *------- <<< Use Configuration Wizard in Context Menu >>> ------------------

@@ -150,7 +150,6 @@ const PinMap PinMap_UART_TX[] = {
     {P9_5  , UART0, 4}, /* for 208QFP */
     {P9_0  , UART1, 4}, /* for 208QFP */
     {P3_15 , UART1, 5},
-    {P3_15 , UART1, 5},
     {P5_7  , UART2, 5},
     {P8_10 , UART2, 4}, /* for 208QFP */
     {P7_1  , UART2, 4},

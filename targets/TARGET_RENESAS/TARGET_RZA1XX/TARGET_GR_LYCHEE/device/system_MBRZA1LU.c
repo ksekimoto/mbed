@@ -1,5 +1,5 @@
 /**************************************************************************//**
- * @file     system_MBRZA1H.c
+ * @file     system_MBRZA1LU.c
  * @brief    CMSIS Device System Source File for
  *           ARM Cortex-A9 Device Series
  * @version  V1.00
