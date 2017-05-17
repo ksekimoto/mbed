@@ -998,9 +998,9 @@ static void can_set_frequency(can_t *obj, int f) {
 
 static void can_set_global_mode(int mode) {
     /* set Global mode */
-    RSCAN0GCTR = ((RSCAN0GCTR & 0xFFFFFFFC) | mode);
+    RSCAN0GCTR = ((RSCAN0GCTR & 0xFFFFFFFC) | (uint32_t)mode);
     /* Wait to cahnge into Global XXXX mode */
-    while ((RSCAN0GSTS & 0x07) != mode) {
+    while ((RSCAN0GSTS & 0x07) != (uint32_t)mode) {
         __NOP();
     }
 }
@@ -1011,10 +1011,10 @@ static void can_set_channel_mode(uint32_t ch, int mode) {
 
     /* set Channel mode */
     dmy_ctr = CTR_MATCH[ch];
-    *dmy_ctr = ((*dmy_ctr & 0xFFFFFFFC) | mode);
+    *dmy_ctr = ((*dmy_ctr & 0xFFFFFFFC) | (uint32_t)mode);
     /* Wait to cahnge into Channel XXXX mode */
     dmy_sts = STS_MATCH[ch];
-    while ((*dmy_sts & 0x07) != mode) {
+    while ((*dmy_sts & 0x07) != (uint32_t)mode) {
         __NOP();
     }
 }

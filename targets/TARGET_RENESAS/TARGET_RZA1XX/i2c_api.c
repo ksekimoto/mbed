@@ -399,7 +399,6 @@ int i2c_read(i2c_t *obj, int address, char *data, int length, int stop) {
     int count = 0;
     int status;
     int value;
-    volatile uint32_t work_reg = 0;
 
     i2c_set_MR3_ACK(obj);
     /* There is a STOP condition for last processing */

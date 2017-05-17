@@ -148,7 +148,7 @@ void spi_frequency(spi_t *obj, int hz) {
     
     hz_min = pclk_base / 2 / 256 / 8;
     hz_max = pclk_base / 2;
-    if ((hz < hz_min) || (hz > hz_max)) {
+    if (((uint32_t)hz < hz_min) || ((uint32_t)hz > hz_max)) {
         error("Couldn't setup requested SPI frequency");
         return;
     }
@@ -484,7 +484,7 @@ void spi_master_transfer(spi_t *obj, const void *tx, size_t tx_length, void *rx,
     obj->rx_buff.length = rx_length * bit_width / 8;
     obj->rx_buff.pos = 0;
     obj->rx_buff.width = bit_width;
-    for (i = 0; i < obj->rx_buff.length; i++) {
+    for (i = 0; i < (int)obj->rx_buff.length; i++) {
         ((uint8_t *)obj->rx_buff.buffer)[i] = SPI_FILL_WORD;
     }
     
