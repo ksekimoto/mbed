@@ -43,15 +43,15 @@ typedef enum {
     P9_0, P9_1, P9_2, P9_3, P9_4, P9_5, P9_6, P9_7, P9_8, P9_9, P9_10, P9_11, P9_12, P9_13, P9_14, P9_15,
 
     // mbed Pin Names
-    LED1 = P2_2,
-    LED2 = P3_13,
-    LED3 = P3_11,
-    LED4 = P2_4,
+    LED1 = P2_4,
+    LED2 = P3_11,
+    LED3 = P3_13,
+    LED4 = P2_2,
 
-    LED_RED    = LED1,
-    LED_ORANGE = LED2,
-    LED_YELLOW = LED3,
-    LED_GREEN  = LED4,
+    LED_GREEN  = LED1,
+    LED_YELLOW = LED2,
+    LED_ORANGE = LED3,
+    LED_RED    = LED4,
 
     USBTX = P7_11,
     USBRX = P0_3,
