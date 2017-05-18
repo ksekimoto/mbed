@@ -19,7 +19,7 @@
 #include "mbed_interface.h"
 #include "mbed_toolchain.h"
 #include "mbed_error.h"
-#include "ether_iodefine.h"
+#include "iodefine.h"
 #include "ethernetext_api.h"
 
 #if DEVICE_ETHERNET

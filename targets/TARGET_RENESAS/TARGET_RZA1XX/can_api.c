@@ -19,7 +19,7 @@
 #include "RZ_A1_Init.h"
 #include "cmsis.h"
 #include "PeripheralPins.h"
-#include "rscan0_iodefine.h"
+#include "iodefine.h"
 #include "r_typedefs.h"
 #include "mbed_drv_cfg.h"
 
@@ -885,7 +885,9 @@ static void can_reset_reg(can_t *obj) {
 static void can_reset_recv_rule(can_t *obj) {
     /* number of receive rules of each chanel = 64 */
     RSCAN0GAFLCFG0 = 0x40404040;
+#if defined(TARGET_RZA1H)
     RSCAN0GAFLCFG1 = 0x40000000;
+#endif
     /* enable receive rule table writing */
     RSCAN0GAFLECTR = 0x00000100;
     /* set the page number of receive rule table(ex: id ch = 1, page number = 4) */
@@ -936,8 +938,10 @@ static void can_reset_buffer(can_t *obj) {
     *dmy_cfcc |= 0x02;
     /* TMIEp interrupt is disable */
     RSCAN0TMIEC0 = 0x00000000;
+#if defined(TARGET_RZA1H)
     RSCAN0TMIEC1 = 0x00000000;
     RSCAN0TMIEC2 = 0x00000000;
+#endif
 }
 
 static void can_reconfigure_channel(void) {

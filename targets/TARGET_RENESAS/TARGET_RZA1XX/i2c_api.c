@@ -20,7 +20,7 @@
 #include "PeripheralPins.h"
 #include "r_typedefs.h"
 
-#include "riic_iodefine.h"
+#include "iodefine.h"
 #include "RZ_A1_Init.h"
 
 volatile struct st_riic *RIIC[] = RIIC_ADDRESS_LIST;
@@ -205,6 +205,7 @@ static inline void i2c_power_enable(i2c_t *obj) {
             break;
     }
     dummy = CPGSTBCR9;
+    (void)dummy;
 }
 
 void i2c_init(i2c_t *obj, PinName sda, PinName scl) {

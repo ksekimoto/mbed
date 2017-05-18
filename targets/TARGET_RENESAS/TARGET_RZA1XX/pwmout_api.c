@@ -18,8 +18,7 @@
 #include "cmsis.h"
 #include "PeripheralPins.h"
 #include "RZ_A1_Init.h"
-#include "cpg_iodefine.h"
-#include "pwm_iodefine.h"
+#include "iodefine.h"
 #include "gpio_addrdefine.h"
 #include "mbed_drv_cfg.h"
 

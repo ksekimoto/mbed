@@ -50,6 +50,7 @@ void spi_init(spi_t *obj, PinName mosi, PinName miso, PinName sclk, PinName ssel
     // enable power and clocking
     CPGSTBCR10 &= ~(0x80 >> spi);
     dummy = CPGSTBCR10;
+    (void)dummy;
     
     obj->spi.spi->SPCR   = 0x00;  // CTRL to 0
     obj->spi.spi->SPSCR  = 0x00;  // no sequential operation

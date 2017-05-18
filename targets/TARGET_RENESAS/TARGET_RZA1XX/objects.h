@@ -22,7 +22,6 @@
 #include "PeripheralNames.h"
 #include "PinNames.h"
 #include "gpio_object.h"
-#include "rspi_iodefine.h"
 
 #ifdef __cplusplus
 extern "C" {

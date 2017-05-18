@@ -16,7 +16,7 @@
 #include <stddef.h>
 #include "us_ticker_api.h"
 #include "PeripheralNames.h"
-#include "ostm_iodefine.h"
+#include "iodefine.h"
 #include "cmsis.h"
 
 #include "RZ_A1_Init.h"

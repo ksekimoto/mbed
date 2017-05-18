@@ -16,7 +16,7 @@
 #include <stddef.h>
 
 #include "gpio_irq_api.h"
-#include "intc_iodefine.h"
+#include "iodefine.h"
 #include "PeripheralPins.h"
 #include "cmsis.h"
 #include "gpio_addrdefine.h"

@@ -19,8 +19,7 @@
 #include "cmsis.h"
 #include "PeripheralPins.h"
 
-#include "adc_iodefine.h"
-#include "cpg_iodefine.h"
+#include "iodefine.h"
 
 #define ANALOGIN_MEDIAN_FILTER      0
 

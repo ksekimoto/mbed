@@ -25,8 +25,7 @@
 #include "gpio_api.h"
 #include "RZ_A1_Init.h"
 
-#include "scif_iodefine.h"
-#include "cpg_iodefine.h"
+#include "iodefine.h"
 #include "mbed_drv_cfg.h"
 
 /******************************************************************************
