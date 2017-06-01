@@ -237,7 +237,7 @@ void serial_baud(serial_t *obj, int baudrate) {
     if (baudrate > (int)(pclk_base / 0x800)) {
         obj->serial.uart->SCSMR &= ~0x0003;
         obj->serial.uart->SCEMR  = 0x0081;  // BGDM = 1, ABCS = 1
-        DL = pclk_base / (8 * baudrate);
+        DL = (pclk_base + (4 * baudrate)) / (8 * baudrate);  // Rounding
         if (DL > 0) {
             DL--;
         }
@@ -247,7 +247,7 @@ void serial_baud(serial_t *obj, int baudrate) {
         obj->serial.uart->SCEMR  = 0x0000;
         obj->serial.uart->SCBRR  = 0xFFu;
     } else {
-        DL = pclk_base / (16 * baudrate);
+        DL = (pclk_base + (8 * baudrate)) / (16 * baudrate);  // Rounding
         while (DL > 256) {
             DL >>= 1;
             if (bgdm == 1) {
