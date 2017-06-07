@@ -78,7 +78,6 @@ serial_t stdio_uart;
 struct serial_global_data_s {
     uint32_t serial_irq_id;
     gpio_t sw_rts, sw_cts;
-    uint8_t rx_irq_set_flow, rx_irq_set_api;
     serial_t *tranferring_obj, *receiving_obj;
     uint32_t async_tx_callback, async_rx_callback;
     int event, wanted_rx_events;
@@ -161,7 +160,7 @@ void serial_init(serial_t *obj, PinName tx, PinName rx) {
 
     /* ---- FIFO control register (SCFCR) setting ---- */
     /* Transmit FIFO reset & Receive FIFO data register reset */
-    obj->serial.uart->SCFCR = 0x0006;
+    obj->serial.uart->SCFCR = 0x0006u;
 
     /* ---- Serial status register (SCFSR) setting ---- */
     dummy = obj->serial.uart->SCFSR;
@@ -543,7 +542,13 @@ static void serial_irq_set_irq(IRQn_Type IRQn, IRQHandler handler, uint32_t enab
     }
 }
 
-static void serial_irq_set_internal(serial_t *obj, SerialIrq irq, uint32_t enable) {
+static void serial_irq_err_set(serial_t *obj, uint32_t enable)
+{
+    serial_irq_set_irq(irq_set_tbl[obj->serial.index][2], hander_set_tbl[obj->serial.index][2], enable);
+    serial_irq_set_irq(irq_set_tbl[obj->serial.index][3], hander_set_tbl[obj->serial.index][3], enable);
+}
+
+void serial_irq_set(serial_t *obj, SerialIrq irq, uint32_t enable) {
     IRQn_Type IRQn;
     IRQHandler handler;
 
@@ -553,24 +558,6 @@ static void serial_irq_set_internal(serial_t *obj, SerialIrq irq, uint32_t enabl
     if ((obj->serial.index >= 0) && (obj->serial.index <= 7)) {
         serial_irq_set_irq(IRQn, handler, enable);
     }
-}
-
-static void serial_irq_err_set(serial_t *obj, uint32_t enable)
-{
-    serial_irq_set_irq(irq_set_tbl[obj->serial.index][2], hander_set_tbl[obj->serial.index][2], enable);
-    serial_irq_set_irq(irq_set_tbl[obj->serial.index][3], hander_set_tbl[obj->serial.index][3], enable);
-}
-
-void serial_irq_set(serial_t *obj, SerialIrq irq, uint32_t enable) {
-    if (RxIrq == irq) {
-        uart_data[obj->serial.index].rx_irq_set_api = enable;
-    }
-    serial_irq_set_internal(obj, irq, enable);
-}
-
-static void serial_flow_irq_set(serial_t *obj, uint32_t enable) {
-    uart_data[obj->serial.index].rx_irq_set_flow = enable;
-    serial_irq_set_internal(obj, RxIrq, enable);
 }
 
 /******************************************************************************
@@ -659,8 +646,8 @@ void serial_clear(serial_t *obj) {
     was_masked = __disable_irq();
 #endif /* __ICCARM__ */
 
-    obj->serial.uart->SCFCR |=  0x06;          // TFRST = 1, RFRST = 1
-    obj->serial.uart->SCFCR &= ~0x06;          // TFRST = 0, RFRST = 0
+    obj->serial.uart->SCFCR |=  0x0006u;       // TFRST = 1, RFRST = 1
+    obj->serial.uart->SCFCR &= ~0x0006u;       // TFRST = 0, RFRST = 0
     obj->serial.uart->SCFSR &= ~0x0093u;       // ER, BRK, RDF, DR = 0
 
     if (!was_masked) {
@@ -706,15 +693,13 @@ void serial_set_flow_control(serial_t *obj, FlowControl type, PinName rxflow, Pi
     // determine the UART to use
     int was_masked;
 
-    serial_flow_irq_set(obj, 0);
-
     if (type == FlowControlRTSCTS) {
 #if defined ( __ICCARM__ )
         was_masked = __disable_irq_iar();
 #else
         was_masked = __disable_irq();
 #endif /* __ICCARM__ */
-        obj->serial.uart->SCFCR = 0x0008u;   // CTS/RTS enable
+        obj->serial.uart->SCFCR |= 0x0008u;   // CTS/RTS enable
         if (!was_masked) {
             __enable_irq();
         }
@@ -726,7 +711,7 @@ void serial_set_flow_control(serial_t *obj, FlowControl type, PinName rxflow, Pi
 #else
         was_masked = __disable_irq();
 #endif /* __ICCARM__ */
-        obj->serial.uart->SCFCR = 0x0000u; // CTS/RTS diable
+        obj->serial.uart->SCFCR &= ~0x0008u; // CTS/RTS diable
         if (!was_masked) {
             __enable_irq();
         }
