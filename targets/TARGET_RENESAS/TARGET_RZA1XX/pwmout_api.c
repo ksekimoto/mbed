@@ -294,7 +294,11 @@ void pwmout_write(pwmout_t* obj, float value) {
         tmp_pwm = (int)(obj->pwm - MTU2_PWM_OFFSET);
         wk_cycle = *MTU2_PWM_MATCH[tmp_pwm][MTU2_PERIOD] & 0xffff;
         // set channel match to percentage
-        *MTU2_PWM_MATCH[tmp_pwm][MTU2_PULSE] = (uint16_t)((float)wk_cycle * value);
+        if (value == 1.0f) {
+            *MTU2_PWM_MATCH[tmp_pwm][MTU2_PULSE] = (uint16_t)(wk_cycle - 1);
+        } else {
+            *MTU2_PWM_MATCH[tmp_pwm][MTU2_PULSE] = (uint16_t)((float)wk_cycle * value);
+        }
 #endif
     } else {
 #ifdef FUNC_MOTOR_CTL_PWM
