@@ -92,7 +92,7 @@ typedef enum {
 
 #define STDIO_UART_TX     USBTX
 #define STDIO_UART_RX     USBRX
-#define STDIO_UART        UART3
+#define STDIO_UART        UART1
 
 
 

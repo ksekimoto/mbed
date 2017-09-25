@@ -44,8 +44,8 @@ typedef enum {
 
     // mbed Pin Names
     LED1 = P2_4,
-    LED2 = P3_11,
-    LED3 = P3_13,
+    LED2 = P2_5,
+    LED3 = P7_0,
     LED4 = P2_2,
 
     LED_GREEN  = LED1,
@@ -53,8 +53,8 @@ typedef enum {
     LED_ORANGE = LED3,
     LED_RED    = LED4,
 
-    USBTX = P7_11,
-    USBRX = P0_3,
+    USBTX = P3_15,
+    USBRX = P0_2,
 
     // Arduiono Pin Names
     D0 = P5_14,
@@ -84,8 +84,8 @@ typedef enum {
     I2C_SCL = D15,
     I2C_SDA = D14,
 
-    USER_BUTTON0 = P5_8,
-    USER_BUTTON1 = P5_11,
+    USER_BUTTON0 = P7_2,
+    USER_BUTTON1 = P7_3,
     USER_BUTTON  = USER_BUTTON0,
 
     // Not connected
