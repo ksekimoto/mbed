@@ -1865,7 +1865,7 @@
         "extra_labels": ["RENESAS", "RZA1XX", "RZA1UL", "MBRZA1LU"],
         "supported_toolchains": ["ARM", "GCC_ARM", "IAR"],
         "inherits": ["Target"],
-        "device_has": ["ANALOGIN", "CAN", "ERROR_PATTERN", "I2C", "I2CSLAVE", "I2C_ASYNCH", "INTERRUPTIN", "PORTIN", "PORTINOUT", "PORTOUT", "PWMOUT", "RTC", "SERIAL", "SERIAL_ASYNCH", "SERIAL_FC", "SPI", "SPISLAVE", "SPI_ASYNCH", "STDIO_MESSAGES"],
+        "device_has": ["ANALOGIN", "CAN", "ERROR_PATTERN", "I2C", "I2CSLAVE", "I2C_ASYNCH", "INTERRUPTIN", "PORTIN", "PORTINOUT", "PORTOUT", "PWMOUT", "RTC", "SERIAL", "SERIAL_ASYNCH", "SERIAL_FC", "SPI", "SPISLAVE", "SPI_ASYNCH", "STDIO_MESSAGES", "TRNG"],
         "features": ["LWIP"],
         "release_versions": ["2", "5"]
     },
