@@ -51,7 +51,6 @@ SECTIONS
 
         Image$$VECTORS$$Base = .;
         * (RESET)
-        Image$$VECTORS$$Limit = .;
         . += 0x00000400;
 
         KEEP(*(.isr_vector))
@@ -74,6 +73,7 @@ SECTIONS
         *(EXCLUDE_FILE(*crtend?.o *crtend.o) .dtors)
         *(SORT(.dtors.*))
         *(.dtors)
+        Image$$VECTORS$$Limit = .;
 
         Image$$RO_DATA$$Base = .;
         *(.rodata*)

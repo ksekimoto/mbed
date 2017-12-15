@@ -46,7 +46,6 @@ SECTIONS
 
         Image$$VECTORS$$Base = .;
         *(.isr_vector)
-        Image$$VECTORS$$Limit = .;
         *(SVC_TABLE)
         *(.text*)
 
@@ -66,6 +65,7 @@ SECTIONS
         *(EXCLUDE_FILE(*crtend?.o *crtend.o) .dtors)
         *(SORT(.dtors.*))
         *(.dtors)
+        Image$$VECTORS$$Limit = .;
 
         Image$$RO_DATA$$Base = .;
         *(.rodata*)
