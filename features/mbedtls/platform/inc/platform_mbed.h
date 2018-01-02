@@ -18,7 +18,7 @@
  */
 
 #if defined(DEVICE_TRNG)
-#define MBEDTLS_ENTROPY_HARDWARE_ALT
+//#define MBEDTLS_ENTROPY_HARDWARE_ALT
 #endif
 
 #if defined(MBEDTLS_CONFIG_HW_SUPPORT)
