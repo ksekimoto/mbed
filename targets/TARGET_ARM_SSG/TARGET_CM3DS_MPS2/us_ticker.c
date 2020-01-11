@@ -1,5 +1,5 @@
 /* mbed Microcontroller Library
- * Copyright (c) 2015 ARM Limited
+ * Copyright (c) 2017-2018 ARM Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,125 +14,105 @@
  * limitations under the License.
  */
 
-/* This file is derivative of us_ticker.c from BEETLE */
+/**
+ * Supports the High-resolution Ticker for mbed by implementing
+ * \ref us_ticker_api.h, using a CMSDK Timer \ref timer_cmsdk_dev_t.
+ */
 
-#include <stddef.h>
-#include "cmsis.h"
 #include "us_ticker_api.h"
-#include "PeripheralNames.h"
+#include "platform_devices.h"
+#include "timer_cmsdk_drv.h"
 
-#define TIMER_MAX_VALUE  0
+static uint64_t total_ticks = 0;
+/* Stores the last reload value, or the last tick value read when a read API
+ * call occurs from the upper layer, needed to keep total_ticks
+ * accumulated properly.
+ */
+static uint32_t previous_ticks = 0;
+static uint32_t last_read = 0;
 
-/* Private data */
-struct us_ticker_drv_data_t {
-    uint32_t inited;          /* us ticker initialized */
-    uint32_t overflow_delta;  /* us ticker overflow */
-    uint32_t overflow_limit;  /* us ticker overflow limit */
-};
-
-static struct us_ticker_drv_data_t us_ticker_drv_data = {
-    .inited = 0,
-    .overflow_delta = 0,
-    .overflow_limit = 0
-};
-
-
-void __us_ticker_irq_handler(void)
+static void restart_timer(uint32_t new_reload)
 {
-    Timer_ClearInterrupt(TIMER1);
-    /*
-     * For each overflow event adds the timer max represented value to
-     * the delta. This allows the us_ticker to keep track of the elapsed
-     * time:
-     * elapsed_time = (num_overflow * overflow_limit) + current_time
-     */
-    us_ticker_drv_data.overflow_delta += us_ticker_drv_data.overflow_limit;
+    timer_cmsdk_disable(&USEC_TIMER_DEV);
+    timer_cmsdk_set_reload_value(&USEC_TIMER_DEV,
+                                 new_reload);
+    timer_cmsdk_reset(&USEC_TIMER_DEV);
+    timer_cmsdk_clear_interrupt(&USEC_TIMER_DEV);
+    timer_cmsdk_enable_interrupt(&USEC_TIMER_DEV);
+    timer_cmsdk_enable(&USEC_TIMER_DEV);
 }
 
 void us_ticker_init(void)
 {
-    uint32_t us_ticker_irqn0 = 0;
-    uint32_t us_ticker_irqn1 = 0;
-
-    if (us_ticker_drv_data.inited) {
-        return;
-    }
-
-    us_ticker_drv_data.inited = 1;
-
-    /* Initialize Timer 0 */
-    Timer_Initialize(TIMER0, TIMER_MAX_VALUE);
-    /* Enable Timer 0 */
-    Timer_Enable(TIMER0);
-
-    /* Initialize Timer 1 */
-    Timer_Initialize(TIMER1, TIMER_MAX_VALUE);
-    /* Enable Timer 1 */
-    Timer_Enable(TIMER1);
-
-    /* Timer 0 get IRQn */
-    us_ticker_irqn0 = Timer_GetIRQn(TIMER0);
-    NVIC_SetVector((IRQn_Type)us_ticker_irqn0, (uint32_t)us_ticker_irq_handler);
-    NVIC_EnableIRQ((IRQn_Type)us_ticker_irqn0);
-
-    /* Timer 1 get IRQn */
-    us_ticker_irqn1 = Timer_GetIRQn(TIMER1);
-    NVIC_SetVector((IRQn_Type)us_ticker_irqn1, (uint32_t)__us_ticker_irq_handler);
-    NVIC_EnableIRQ((IRQn_Type)us_ticker_irqn1);
-
-    /* Timer set interrupt on TIMER1 */
-    Timer_SetInterrupt(TIMER1, TIMER_DEFAULT_RELOAD);
-
-    /*
-     * Set us_ticker Overflow limit. The us_ticker overflow limit is required
-     * to calculated the return value of the us_ticker read function in us
-     * on 32bit.
-     * A 32bit us value cannot be represented directly in the Timer Load
-     * register if it is greater than (0xFFFFFFFF ticks)/TIMER_DIVIDER_US.
-     */
-    us_ticker_drv_data.overflow_limit = Timer_GetReloadValue(TIMER1);
+    timer_cmsdk_init(&USEC_TIMER_DEV);
+    previous_ticks = TIMER_CMSDK_MAX_RELOAD;
+    NVIC_EnableIRQ(USEC_INTERVAL_IRQ);
+    restart_timer(previous_ticks);
 }
 
-uint32_t us_ticker_read()
+void us_ticker_free(void)
 {
-    uint32_t return_value = 0;
-
-    if (!us_ticker_drv_data.inited) {
-        us_ticker_init();
-    }
-
-    return_value = us_ticker_drv_data.overflow_delta + Timer_Read(TIMER1);
-
-    return return_value;
+    timer_cmsdk_disable(&USEC_TIMER_DEV);
 }
 
+uint32_t us_ticker_read(void)
+{
+    if (timer_cmsdk_is_interrupt_active(&USEC_TIMER_DEV)) {
+        total_ticks += previous_ticks;
+        previous_ticks = TIMER_CMSDK_MAX_RELOAD;
+        restart_timer(previous_ticks);
+    } else {
+        uint32_t tick = timer_cmsdk_get_current_value(&USEC_TIMER_DEV);
+
+        if (tick < previous_ticks) {
+            uint32_t delta = previous_ticks - tick;
+            total_ticks += delta;
+            previous_ticks = tick;
+        }
+    }
+    last_read = (uint32_t)(total_ticks >> USEC_REPORTED_SHIFT);
+    return last_read;
+}
+
+/* To ensure that timestamp is always bigger than the current time, it should
+ * be calculated by using the us_ticker_read() method.
+ */
 void us_ticker_set_interrupt(timestamp_t timestamp)
 {
-    uint32_t delta = 0;
-
-    if (!us_ticker_drv_data.inited) {
-        us_ticker_init();
-    }
-
-    delta = timestamp - us_ticker_read();
-
-    /* If the event was not in the past enable interrupt */
-    Timer_SetInterrupt(TIMER0, delta);
-
-}
-
-void us_ticker_fire_interrupt(void)
-{
-    uint32_t us_ticker_irqn1 = Timer_GetIRQn(TIMER1);
-    NVIC_SetPendingIRQ((IRQn_Type)us_ticker_irqn1);
+    uint32_t reload = (timestamp - last_read) << USEC_REPORTED_SHIFT;
+    previous_ticks = reload;
+    restart_timer(previous_ticks);
 }
 
 void us_ticker_disable_interrupt(void)
 {
-    Timer_DisableInterrupt(TIMER0);
+    timer_cmsdk_disable_interrupt(&USEC_TIMER_DEV);
 }
 
 void us_ticker_clear_interrupt(void)
 {
-    Timer_ClearInterrupt(TIMER0);
+    timer_cmsdk_clear_interrupt(&USEC_TIMER_DEV);
+}
+
+void us_ticker_fire_interrupt(void)
+{
+    NVIC_SetPendingIRQ(USEC_INTERVAL_IRQ);
+}
+
+const ticker_info_t* us_ticker_get_info()
+{
+    static const ticker_info_t info = {
+        USEC_REPORTED_FREQ_HZ,
+        USEC_REPORTED_BITS
+    };
+    return &info;
+}
+
+#ifndef usec_interval_irq_handler
+#error "usec_interval_irq_handler should be defined, check device_cfg.h!"vector!
+#endif
+void usec_interval_irq_handler(void)
+{
+    us_ticker_read();
+    us_ticker_irq_handler();
 }

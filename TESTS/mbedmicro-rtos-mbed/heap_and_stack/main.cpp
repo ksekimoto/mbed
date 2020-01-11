@@ -15,9 +15,9 @@
  * limitations under the License.
  */
 
-#if defined(TARGET_CORTEX_A)
-    #error [NOT_SUPPORTED] This function not supported for this target
-#endif
+#if defined(TARGET_CORTEX_A) || !DEVICE_USTICKER || !defined(MBED_CONF_RTOS_PRESENT)
+#error [NOT_SUPPORTED] test not supported.
+#else
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -44,9 +44,15 @@ extern uint32_t mbed_heap_size;
 extern uint32_t mbed_stack_isr_start;
 extern uint32_t mbed_stack_isr_size;
 
+#if defined(TOOLCHAIN_GCC_ARM) && defined(MBED_SPLIT_HEAP)
+extern uint32_t __mbed_sbrk_start_0;
+extern uint32_t __mbed_krbs_start_0;
+unsigned char *mbed_heap_start_0 = (unsigned char *) &__mbed_sbrk_start_0;;
+uint32_t mbed_heap_size_0 = (uint32_t) &__mbed_krbs_start_0 - (uint32_t) &__mbed_sbrk_start_0;
+#endif
 
 struct linked_list {
-    linked_list * next;
+    linked_list *next;
     uint8_t data[MALLOC_TEST_SIZE];
 };
 
@@ -86,7 +92,7 @@ static bool rangeinrange(uint32_t addr, uint32_t size, uint32_t start, uint32_t 
 /*
  * Return true if the region is filled only with the specified value
  */
-static bool valid_fill(uint8_t * data, uint32_t size, uint8_t fill)
+static bool valid_fill(uint8_t *data, uint32_t size, uint8_t fill)
 {
     for (uint32_t i = 0; i < size; i++) {
         if (data[i] != fill) {
@@ -100,29 +106,33 @@ static void allocate_and_fill_heap(linked_list *&head)
 {
     linked_list *current;
 
-    current = (linked_list*) malloc(sizeof(linked_list));
+    current = (linked_list *) malloc(sizeof(linked_list));
     TEST_ASSERT_NOT_NULL(current);
 
     current->next = NULL;
-    memset((void*) current->data, MALLOC_FILL, sizeof(current->data));
+    memset((void *) current->data, MALLOC_FILL, sizeof(current->data));
 
     // Allocate until malloc returns NULL
     head = current;
     while (true) {
 
         // Allocate
-        linked_list *temp = (linked_list*) malloc(sizeof(linked_list));
+        linked_list *temp = (linked_list *) malloc(sizeof(linked_list));
 
         if (NULL == temp) {
             break;
         }
         bool result = rangeinrange((uint32_t) temp, sizeof(linked_list), mbed_heap_start, mbed_heap_size);
-
+#if defined(TOOLCHAIN_GCC_ARM) && defined(MBED_SPLIT_HEAP)
+        if (false == result) {
+            result = rangeinrange((uint32_t) temp, sizeof(linked_list), (uint32_t)mbed_heap_start_0, mbed_heap_size_0);
+        }
+#endif
         TEST_ASSERT_TRUE_MESSAGE(result, "Memory allocation out of range");
 
         // Init
         temp->next = NULL;
-        memset((void*) temp->data, MALLOC_FILL, sizeof(current->data));
+        memset((void *) temp->data, MALLOC_FILL, sizeof(current->data));
 
         // Add to list
         current->next = temp;
@@ -133,7 +143,7 @@ static void allocate_and_fill_heap(linked_list *&head)
 static void check_and_free_heap(linked_list *head, uint32_t &max_allocation_size)
 {
     uint32_t total_size = 0;
-    linked_list * current = head;
+    linked_list *current = head;
 
     while (current != NULL) {
         total_size += sizeof(linked_list);
@@ -141,7 +151,7 @@ static void check_and_free_heap(linked_list *head, uint32_t &max_allocation_size
 
         TEST_ASSERT_TRUE_MESSAGE(result, "Memory fill check failed");
 
-        linked_list * next = current->next;
+        linked_list *next = current->next;
         free(current);
         current = next;
     }
@@ -161,11 +171,15 @@ void test_heap_in_range(void)
     char *initial_heap;
 
     // Sanity check malloc
-    initial_heap = (char*) malloc(1);
+    initial_heap = (char *) malloc(1);
     TEST_ASSERT_NOT_NULL(initial_heap);
 
     bool result = inrange((uint32_t) initial_heap, mbed_heap_start, mbed_heap_size);
-
+#if defined(TOOLCHAIN_GCC_ARM) && defined(MBED_SPLIT_HEAP)
+    if (false == result) {
+        result = inrange((uint32_t) initial_heap, (uint32_t)mbed_heap_start_0, mbed_heap_size_0);
+    }
+#endif
     TEST_ASSERT_TRUE_MESSAGE(result, "Heap in wrong location");
     free(initial_heap);
 }
@@ -178,10 +192,10 @@ void test_heap_in_range(void)
  */
 void test_main_stack_in_range(void)
 {
-    os_thread_t *thread = (os_thread_t*) osThreadGetId();
+    mbed_rtos_storage_thread_t *thread = (mbed_rtos_storage_thread_t *) osThreadGetId();
 
     uint32_t psp = __get_PSP();
-    uint8_t *stack_mem = (uint8_t*) thread->stack_mem;
+    uint8_t *stack_mem = (uint8_t *) thread->stack_mem;
     uint32_t stack_size = thread->stack_size;
 
     // PSP stack should be somewhere in the middle
@@ -200,7 +214,7 @@ void test_isr_stack_in_range(void)
 {
     // MSP stack should be very near end (test using within 128 bytes)
     uint32_t msp = __get_MSP();
-    bool result = inrange(msp, mbed_stack_isr_start + mbed_stack_isr_size - 128, 128);
+    bool result = inrange(msp, mbed_stack_isr_start + mbed_stack_isr_size - 0x400, 0x400);
 
     TEST_ASSERT_TRUE_MESSAGE(result, "Interrupt stack in wrong location");
 }
@@ -222,7 +236,7 @@ void test_heap_allocation_free(void)
     check_and_free_heap(head, max_allocation_size);
 
     // Force a task switch so a stack check is performed
-    Thread::wait(10);
+    ThisThread::sleep_for(10);
 
     printf("Total size dynamically allocated: %luB\n", max_allocation_size);
 }
@@ -248,3 +262,5 @@ int main()
 {
     return !utest::v1::Harness::run(specification);
 }
+
+#endif // defined(TARGET_CORTEX_A) || !DEVICE_USTICKER || !defined(MBED_CONF_RTOS_PRESENT)

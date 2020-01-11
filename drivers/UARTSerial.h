@@ -1,5 +1,6 @@
 /* mbed Microcontroller Library
- * Copyright (c) 2006-2017 ARM Limited
+ * Copyright (c) 2006-2019 ARM Limited
+ * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,12 +22,11 @@
 
 #if (DEVICE_SERIAL && DEVICE_INTERRUPTIN) || defined(DOXYGEN_ONLY)
 
-#include "FileHandle.h"
-#include "SerialBase.h"
-#include "InterruptIn.h"
-#include "PlatformMutex.h"
-#include "serial_api.h"
-#include "CircularBuffer.h"
+#include "platform/FileHandle.h"
+#include "drivers/SerialBase.h"
+#include "drivers/InterruptIn.h"
+#include "platform/PlatformMutex.h"
+#include "platform/CircularBuffer.h"
 #include "platform/NonCopyable.h"
 
 #ifndef MBED_CONF_DRIVERS_UART_SERIAL_RXBUF_SIZE
@@ -38,12 +38,14 @@
 #endif
 
 namespace mbed {
-
-/** \addtogroup drivers */
+/**
+ * \defgroup drivers_UARTSerial UARTSerial class
+ * \ingroup drivers-public-api-uart
+ * @{
+ */
 
 /** Class providing buffered UART communication functionality using separate circular buffer for send and receive channels
- *  
- * @ingroup drivers
+ *
  */
 
 class UARTSerial : private SerialBase, public FileHandle, private NonCopyable<UARTSerial> {
@@ -56,6 +58,13 @@ public:
      *  @param baud The baud rate of the serial port (optional, defaults to MBED_CONF_PLATFORM_DEFAULT_SERIAL_BAUD_RATE)
      */
     UARTSerial(PinName tx, PinName rx, int baud = MBED_CONF_PLATFORM_DEFAULT_SERIAL_BAUD_RATE);
+
+    /** Create a UARTSerial port, connected to the specified transmit and receive pins, with a particular baud rate.
+     *  @param static_pinmap reference to structure which holds static pinmap
+     *  @param baud The baud rate of the serial port (optional, defaults to MBED_CONF_PLATFORM_DEFAULT_SERIAL_BAUD_RATE)
+     */
+    UARTSerial(const serial_pinmap_t &static_pinmap, int baud = MBED_CONF_PLATFORM_DEFAULT_SERIAL_BAUD_RATE);
+
     virtual ~UARTSerial();
 
     /** Equivalent to POSIX poll(). Derived from FileHandle.
@@ -81,7 +90,7 @@ public:
      *  @param length   The number of bytes to write
      *  @return         The number of bytes written, negative error on failure
      */
-    virtual ssize_t write(const void* buffer, size_t length);
+    virtual ssize_t write(const void *buffer, size_t length);
 
     /** Read the contents of a file into a buffer
      *
@@ -95,7 +104,7 @@ public:
      *  @param length   The number of bytes to read
      *  @return         The number of bytes read, 0 at end of file, negative error on failure
      */
-    virtual ssize_t read(void* buffer, size_t length);
+    virtual ssize_t read(void *buffer, size_t length);
 
     /** Close a file
      *
@@ -141,6 +150,45 @@ public:
         _blocking = blocking;
         return 0;
     }
+
+    /** Check current blocking or non-blocking mode for file operations.
+     *
+     *  @return             true for blocking mode, false for non-blocking mode.
+     */
+    virtual bool is_blocking() const
+    {
+        return _blocking;
+    }
+
+    /** Enable or disable input
+     *
+     * Control enabling of device for input. This is primarily intended
+     * for temporary power-saving; the overall ability of the device to operate for
+     * input and/or output may be fixed at creation time, but this call can
+     * allow input to be temporarily disabled to permit power saving without
+     * losing device state.
+     *
+     *  @param enabled      true to enable input, false to disable.
+     *
+     *  @return             0 on success
+     *  @return             Negative error code on failure
+     */
+    virtual int enable_input(bool enabled);
+
+    /** Enable or disable output
+     *
+     * Control enabling of device for output. This is primarily intended
+     * for temporary power-saving; the overall ability of the device to operate for
+     * input and/or output may be fixed at creation time, but this call can
+     * allow output to be temporarily disabled to permit power saving without
+     * losing device state.
+     *
+     *  @param enabled      true to enable output, false to disable.
+     *
+     *  @return             0 on success
+     *  @return             Negative error code on failure
+     */
+    virtual int enable_output(bool enabled);
 
     /** Register a callback on state change of the file.
      *
@@ -192,7 +240,7 @@ public:
      *  @param parity The parity used (None, Odd, Even, Forced1, Forced0; default = None)
      *  @param stop_bits The number of stop bits (1 or 2; default = 1)
      */
-    void set_format(int bits=8, Parity parity=UARTSerial::None, int stop_bits=1);
+    void set_format(int bits = 8, Parity parity = UARTSerial::None, int stop_bits = 1);
 
 #if DEVICE_SERIAL_FC
     // For now use the base enum - but in future we may have extra options
@@ -210,12 +258,10 @@ public:
      *  @param flow1 the first flow control pin (RTS for RTS or RTSCTS, CTS for CTS)
      *  @param flow2 the second flow control pin (CTS for RTSCTS)
      */
-    void set_flow_control(Flow type, PinName flow1=NC, PinName flow2=NC);
+    void set_flow_control(Flow type, PinName flow1 = NC, PinName flow2 = NC);
 #endif
 
 private:
-
-    void wait_ms(uint32_t millisec);
 
     /** SerialBase lock override */
     virtual void lock(void);
@@ -228,6 +274,14 @@ private:
 
     /** Release mutex */
     virtual void api_unlock(void);
+
+    /** Unbuffered write - invoked when write called from critical section */
+    ssize_t write_unbuffered(const char *buf_ptr, size_t length);
+
+    void enable_rx_irq();
+    void disable_rx_irq();
+    void enable_tx_irq();
+    void disable_tx_irq();
 
     /** Software serial buffers
      *  By default buffer size is 256 for TX and 256 for RX. Configurable through mbed_app.json
@@ -242,6 +296,8 @@ private:
     bool _blocking;
     bool _tx_irq_enabled;
     bool _rx_irq_enabled;
+    bool _tx_enabled;
+    bool _rx_enabled;
     InterruptIn *_dcd_irq;
 
     /** Device Hanged up
@@ -264,6 +320,9 @@ private:
     void dcd_irq(void);
 
 };
+
+/** @}*/
+
 } //namespace mbed
 
 #endif //(DEVICE_SERIAL && DEVICE_INTERRUPTIN) || defined(DOXYGEN_ONLY)

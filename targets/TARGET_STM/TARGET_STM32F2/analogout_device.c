@@ -74,7 +74,7 @@ void analogout_init(dac_t *obj, PinName pin)
     obj->handle.Instance = (DAC_TypeDef *)(obj->dac);
     obj->handle.State = HAL_DAC_STATE_RESET;
 
-    if (HAL_DAC_Init(&obj->handle) != HAL_OK ) {
+    if (HAL_DAC_Init(&obj->handle) != HAL_OK) {
         error("HAL_DAC_Init failed");
     }
 
@@ -97,6 +97,11 @@ void analogout_free(dac_t *obj)
 
     // Configure GPIO
     pin_function(obj->pin, STM_PIN_DATA(STM_MODE_INPUT, GPIO_NOPULL, 0));
+}
+
+const PinMap *analogout_pinmap()
+{
+    return PinMap_DAC;
 }
 
 #endif // DEVICE_ANALOGOUT

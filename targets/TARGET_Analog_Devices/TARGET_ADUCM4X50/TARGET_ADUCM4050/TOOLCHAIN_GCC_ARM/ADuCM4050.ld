@@ -1,19 +1,29 @@
 /*
- * Portions Copyright (c) 2016 Analog Devices, Inc.
+ * Portions Copyright (c) 2016 - 2018 Analog Devices, Inc.
  *
  * Based on Device/ARM/ARMCM4/Source/GCC/gcc_arm.ld file in
  * ARM.CMSIS.4.5.0.pack.
  */
 
+#if !defined(MBED_APP_START)
+  #define MBED_APP_START 0
+#endif
+
+#if !defined(MBED_APP_SIZE)
+  #define MBED_APP_SIZE 0x7F000
+#endif
+
+#define ADUCM_SECTOR_SIZE 0x800
+
 /* Linker script to configure memory regions. */
 MEMORY
 {
   /* The first 0x800 bytes of flash */
-  FLASH0 (rx) : ORIGIN = 0x00000000, LENGTH = 0x800
-  /* The remaining bytes of flash minus 4KB Protected Key Storage */
-  FLASH (rx) : ORIGIN = 0x00000800, LENGTH = 512k - 4k - 0x800
+  FLASH0 (rx) : ORIGIN = MBED_APP_START, LENGTH = ADUCM_SECTOR_SIZE
+  /* The rest of the flash */
+  FLASH (rx) : ORIGIN = MBED_APP_START + ADUCM_SECTOR_SIZE, LENGTH = MBED_APP_SIZE - ADUCM_SECTOR_SIZE
   /* SRAM bank 0 */
-  DSRAM_A (rwx) : ORIGIN = 0x20000200, LENGTH = 32k - 0x200
+  DSRAM_A (rwx) : ORIGIN = 0x20000200, LENGTH = 28k - 0x200
   /* SRAM bank 3+4+5+6+7 */
   DSRAM_B (rwx) : ORIGIN = 0x20048000, LENGTH = 64k
   /* stack must not be in bank 1,2,7 where ISRAM or CACHE
@@ -24,7 +34,10 @@ MEMORY
 GROUP(libgcc.a libc.a libm.a libnosys.a)
 
 /* Custom stack and heap sizes */
-__stack_size__ = 0x2000;
+#if !defined(MBED_BOOT_STACK_SIZE)
+    #define MBED_BOOT_STACK_SIZE 0x400
+#endif
+__stack_size__ = MBED_BOOT_STACK_SIZE;
 __heap_size__  = 0x6000;
 
 /* select custom or default sizes for stack and heap */
@@ -76,13 +89,6 @@ SECTIONS
         KEEP(*(.checksum))
     } > FLASH0
 
-    .security_options :
-    {
-        . = ALIGN(4);
-        KEEP(*(.security_options))
-        . = ALIGN(4);
-    } > FLASH0
-
     .text :
     {
         *(.text*)
@@ -127,7 +133,7 @@ SECTIONS
     /*
     .copy.table :
     {
-        . = ALIGN(4);
+        . = ALIGN(8);
         __copy_table_start__ = .;
         LONG (__etext)
         LONG (__data_start__)
@@ -145,7 +151,7 @@ SECTIONS
 
     .zero.table :
     {
-        . = ALIGN(4);
+        . = ALIGN(8);
         __zero_table_start__ = .;
         LONG (__bss_start__)
         LONG (__bss_end__ - __bss_start__)
@@ -163,13 +169,13 @@ SECTIONS
         *(vtable)
         *(.data*)
 
-        . = ALIGN(4);
+        . = ALIGN(8);
         /* preinit data */
         PROVIDE_HIDDEN (__preinit_array_start = .);
         KEEP(*(.preinit_array))
         PROVIDE_HIDDEN (__preinit_array_end = .);
 
-        . = ALIGN(4);
+        . = ALIGN(8);
         /* init data */
         PROVIDE_HIDDEN (__init_array_start = .);
         KEEP(*(SORT(.init_array.*)))
@@ -177,7 +183,7 @@ SECTIONS
         PROVIDE_HIDDEN (__init_array_end = .);
 
 
-        . = ALIGN(4);
+        . = ALIGN(8);
         /* finit data */
         PROVIDE_HIDDEN (__fini_array_start = .);
         KEEP(*(SORT(.fini_array.*)))
@@ -185,7 +191,7 @@ SECTIONS
         PROVIDE_HIDDEN (__fini_array_end = .);
 
         KEEP(*(.jcr*))
-        . = ALIGN(4);
+        . = ALIGN(8);
         /* All data end */
         __data_end__ = .;
 

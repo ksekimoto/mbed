@@ -33,6 +33,7 @@ extern "C" {
     int testPure();
     int testForceInline();
     int testNoReturn();
+    int testFallthrough();
     int testUnreachable();
     int testDeprecated();
 }
@@ -40,11 +41,13 @@ extern "C" {
 
 // Test wrapper and test cases for utest
 template <int (*F)()>
-void test_wrapper() {
+void test_wrapper()
+{
     TEST_ASSERT_UNLESS(F());
 }
 
-utest::v1::status_t test_setup(const size_t number_of_cases) {
+utest::v1::status_t test_setup(const size_t number_of_cases)
+{
     GREENTEA_SETUP(5, "default_auto");
     return verbose_test_setup_handler(number_of_cases);
 }
@@ -57,12 +60,14 @@ Case cases[] = {
     Case("Testing PURE attribute",          test_wrapper<testPure>),
     Case("Testing FORCEINLINE attribute",   test_wrapper<testForceInline>),
     Case("Testing NORETURN attribute",      test_wrapper<testNoReturn>),
+    Case("Testing FALLTHROUGH attribute",   test_wrapper<testFallthrough>),
     Case("Testing UNREACHABLE attribute",   test_wrapper<testUnreachable>),
     Case("Testing DEPRECATED attribute",    test_wrapper<testDeprecated>),
 };
 
 Specification specification(test_setup, cases);
 
-int main() {
+int main()
+{
     return !Harness::run(specification);
 }

@@ -1,8 +1,6 @@
-
-/** \addtogroup platform */
-/** @{*/
 /* mbed Microcontroller Library
- * Copyright (c) 2017-2017 ARM Limited
+ * Copyright (c) 2017-2019 ARM Limited
+ * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,6 +25,9 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/** \addtogroup platform-public-api */
+/** @{*/
 
 /**
  * \defgroup platform_mktime mktime functions
@@ -90,7 +91,7 @@ bool _rtc_is_leap_year(int year, rtc_leap_year_support_t leap_year_support);
  * @note Full and partial leap years support.
  * @note For use by the HAL only
  */
-bool _rtc_maketime(const struct tm* time, time_t * seconds, rtc_leap_year_support_t leap_year_support);
+bool _rtc_maketime(const struct tm *time, time_t *seconds, rtc_leap_year_support_t leap_year_support);
 
 /* Convert a given time in seconds since epoch into calendar time.
  *
@@ -118,7 +119,7 @@ bool _rtc_maketime(const struct tm* time, time_t * seconds, rtc_leap_year_suppor
  * @note For use by the HAL only.
  * @note Full and partial leap years support.
  */
-bool _rtc_localtime(time_t timestamp, struct tm* time_info, rtc_leap_year_support_t leap_year_support);
+bool _rtc_localtime(time_t timestamp, struct tm *time_info, rtc_leap_year_support_t leap_year_support);
 
 /** @}*/
 

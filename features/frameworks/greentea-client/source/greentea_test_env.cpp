@@ -18,11 +18,10 @@
 #include <ctype.h>
 #include <cstdio>
 #include <string.h>
-#include "mbed.h"
 #include "greentea-client/test_env.h"
-#include "greentea-client/greentea_serial.h"
 #include "greentea-client/greentea_metrics.h"
-
+#include "mbed_trace.h"
+#include "platform/mbed_retarget.h"
 
 /**
  *   Generic test suite transport protocol keys
@@ -58,7 +57,6 @@ static void greentea_notify_timeout(const int);
 static void greentea_notify_hosttest(const char *);
 static void greentea_notify_completion(const int);
 static void greentea_notify_version();
-static void greentea_write_string(const char *str);
 
 /** \brief Handle the handshake with the host
  *  \details This is contains the shared handhshake functionality that is used between
@@ -83,6 +81,10 @@ void _GREENTEA_SETUP_COMMON(const int timeout, const char *host_test_name, char 
         }
     }
 
+#ifdef MBED_CONF_MBED_TRACE_ENABLE
+    mbed_trace_init();
+#endif
+
     greentea_notify_version();
     greentea_notify_timeout(timeout);
     greentea_notify_hosttest(host_test_name);
@@ -95,8 +97,10 @@ void _GREENTEA_SETUP_COMMON(const int timeout, const char *host_test_name, char 
  *           This function is blocking.
  */
 extern "C" void GREENTEA_SETUP(const int timeout, const char *host_test_name) {
+#if ! defined(NO_GREENTEA)
     char _value[GREENTEA_UUID_LENGTH] = {0};
     _GREENTEA_SETUP_COMMON(timeout, host_test_name, _value, GREENTEA_UUID_LENGTH);
+#endif
 }
 
 /** \brief Handshake with host and send setup data (timeout and host test name). Allows you to preserve sync UUID.
@@ -159,8 +163,8 @@ extern bool coverage_report;
  *
  *        Generates preamble of message sent to notify host about code coverage data dump.
  *
- *        This function is used by mbedOS software
- *        (see: mbed-drivers/source/retarget.cpp file) to generate code coverage
+ *        This function is used by Mbed OS
+ *        (see: mbed-os/platform/mbed_retarget.cpp) to generate code coverage
  *        messages to host. When code coverage feature is turned on slave will
  *        print-out code coverage data in form of key-value protocol.
  *        Message with code coverage data will contain message name, path to code
@@ -177,8 +181,8 @@ void greentea_notify_coverage_start(const char *path) {
 /**
  *  \brief Sufix for code coverage message to master (closing statement)
  *
- *         This function is used by mbedOS software
- *         (see: mbed-drivers/source/retarget.cpp file) to generate code coverage
+ *         This function is used by Mbed OS
+ *         (see: mbed-os/platform/mbed_retarget.cpp) to generate code coverage
  *         messages to host. When code coverage feature is turned on slave will
  *         print-out code coverage data in form of key-value protocol.
  *         Message with code coverage data will contain message name, path to code
@@ -205,17 +209,15 @@ void greentea_notify_coverage_end() {
  *
  *        This function writes the preamble "{{" which is required
  *        for key-value comunication between the target and the host.
- *        This uses a Rawserial object, greentea_serial, which provides
- *        a direct interface to the USBTX and USBRX serial pins and allows
- *        the direct writing of characters using the putc() method.
+ *        This uses greentea_putc which allows the direct writing of characters
+ *        using the write() method.
  *        This suite of functions are provided to allow for serial communication
  *        to the host from within a thread/ISR.
- *
  */
-inline void greentea_write_preamble()
+static void greentea_write_preamble()
 {
-    greentea_serial->putc('{');
-    greentea_serial->putc('{');
+    greentea_putc('{');
+    greentea_putc('{');
 }
 
 /**
@@ -223,19 +225,18 @@ inline void greentea_write_preamble()
  *
  *        This function writes the postamble "{{\n" which is required
  *        for key-value comunication between the target and the host.
- *        This uses a Rawserial object, greentea_serial, which provides
- *        a direct interface to the USBTX and USBRX serial pins and allows
- *        the direct writing of characters using the putc() method.
+ *        This uses greentea_putc which allows the direct writing of characters
+ *        using the write() method.
  *        This suite of functions are provided to allow for serial communication
  *        to the host from within a thread/ISR.
  *
  */
-inline void greentea_write_postamble()
+static void greentea_write_postamble()
 {
-    greentea_serial->putc('}');
-    greentea_serial->putc('}');
-    greentea_serial->putc('\r');
-    greentea_serial->putc('\n');
+    greentea_putc('}');
+    greentea_putc('}');
+    greentea_putc('\r');
+    greentea_putc('\n');
 }
 
 /**
@@ -243,17 +244,14 @@ inline void greentea_write_postamble()
  *
  *        This function writes a '\0' terminated string from the target
  *        to the host. It writes directly to the serial port using the
- *        greentea_serial, Rawserial object.
+ *        the write() method.
  *
  * \param str - string value
  *
  */
-inline void greentea_write_string(const char *str)
+void greentea_write_string(const char *str)
 {
-    while (*str != '\0') {
-        greentea_serial->putc(*str);
-        str ++;
-    }
+    write(STDOUT_FILENO, str, strlen(str));
 }
 
 
@@ -263,7 +261,7 @@ inline void greentea_write_string(const char *str)
  *        This function writes an integer value from the target
  *        to the host. The integer value is converted to a string and
  *        and then written character by character directly to the serial
- *        port using the greentea_serial, Rawserial object.
+ *        port using the console.
  *        sprintf() is used to convert the int to a string. Sprintf if
  *        inherently thread safe so can be used.
  *
@@ -271,13 +269,13 @@ inline void greentea_write_string(const char *str)
  *
  */
 #define MAX_INT_STRING_LEN 15
-inline void greentea_write_int(const int val)
+static void greentea_write_int(const int val)
 {
     char intval[MAX_INT_STRING_LEN];
     unsigned int i = 0;
     sprintf(intval, "%d", val);
     while (intval[i] != '\0') {
-        greentea_serial->putc(intval[i]);
+        greentea_putc(intval[i]);
         i++;
     }
 }
@@ -297,7 +295,7 @@ extern "C" void greentea_send_kv(const char *key, const char *val) {
     if (key && val) {
         greentea_write_preamble();
         greentea_write_string(key);
-        greentea_serial->putc(';');
+        greentea_putc(';');
         greentea_write_string(val);
         greentea_write_postamble();
     }
@@ -320,7 +318,7 @@ void greentea_send_kv(const char *key, const int val) {
     if (key) {
         greentea_write_preamble();
         greentea_write_string(key);
-        greentea_serial->putc(';');
+        greentea_putc(';');
         greentea_write_int(val);
         greentea_write_postamble();
     }
@@ -344,9 +342,9 @@ void greentea_send_kv(const char *key, const char *val, const int result) {
     if (key) {
         greentea_write_preamble();
         greentea_write_string(key);
-        greentea_serial->putc(';');
+        greentea_putc(';');
         greentea_write_string(val);
-        greentea_serial->putc(';');
+        greentea_putc(';');
         greentea_write_int(result);
         greentea_write_postamble();
 
@@ -377,11 +375,11 @@ void greentea_send_kv(const char *key, const char *val, const int passes, const 
     if (key) {
         greentea_write_preamble();
         greentea_write_string(key);
-        greentea_serial->putc(';');
+        greentea_putc(';');
         greentea_write_string(val);
-        greentea_serial->putc(';');
+        greentea_putc(';');
         greentea_write_int(passes);
-        greentea_serial->putc(';');
+        greentea_putc(';');
         greentea_write_int(failures);
         greentea_write_postamble();
     }
@@ -410,9 +408,9 @@ void greentea_send_kv(const char *key, const int passes, const int failures) {
     if (key) {
         greentea_write_preamble();
         greentea_write_string(key);
-        greentea_serial->putc(';');
+        greentea_putc(';');
         greentea_write_int(passes);
-        greentea_serial->putc(';');
+        greentea_putc(';');
         greentea_write_int(failures);
         greentea_write_postamble();
     }
@@ -555,7 +553,21 @@ enum Token {
  *
  */
 extern "C" int greentea_getc() {
-    return greentea_serial->getc();
+    uint8_t c;
+    read(STDOUT_FILENO, &c, 1);
+    return c;
+}
+
+
+/**
+ * \brief Write character from stream of data
+ *
+ * \return The number of bytes written
+ *
+ */
+extern "C" void greentea_putc(int c) {
+    uint8_t _c = c;
+    write(STDOUT_FILENO, &_c, 1);
 }
 
 /**
@@ -728,6 +740,7 @@ static int gettok(char *out_str, const int str_size) {
 	if (LastChar == '}') {
 		LastChar = greentea_getc();
 		if (LastChar == '}') {
+			LastChar = '!';
 			return tok_close;
 		}
 	}

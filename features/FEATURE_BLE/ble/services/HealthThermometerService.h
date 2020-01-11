@@ -19,6 +19,8 @@
 
 #include "ble/BLE.h"
 
+#if BLE_FEATURE_GATT_SERVER
+
 /**
 * @class HealthThermometerService
 * @brief BLE Health Thermometer Service. This service provides the location of the thermometer and the temperature.
@@ -53,13 +55,13 @@ public:
     HealthThermometerService(BLE &_ble, float initialTemp, uint8_t _location) :
         ble(_ble),
         valueBytes(initialTemp),
-        tempMeasurement(GattCharacteristic::UUID_TEMPERATURE_MEASUREMENT_CHAR, (TemperatureValueBytes *)valueBytes.getPointer(), GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_NOTIFY),
+        tempMeasurement(GattCharacteristic::UUID_TEMPERATURE_MEASUREMENT_CHAR, (TemperatureValueBytes *)valueBytes.getPointer(), GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_INDICATE),
         tempLocation(GattCharacteristic::UUID_TEMPERATURE_TYPE_CHAR, &_location) {
 
         GattCharacteristic *hrmChars[] = {&tempMeasurement, &tempLocation, };
         GattService         hrmService(GattService::UUID_HEALTH_THERMOMETER_SERVICE, hrmChars, sizeof(hrmChars) / sizeof(GattCharacteristic *));
 
-        ble.addService(hrmService);
+        ble.gattServer().addService(hrmService);
     }
 
     /**
@@ -70,10 +72,8 @@ public:
     *
     */
     void updateTemperature(float temperature) {
-        if (ble.getGapState().connected) {
-            valueBytes.updateTemperature(temperature);
-            ble.gattServer().write(tempMeasurement.getValueHandle(), valueBytes.getPointer(), sizeof(TemperatureValueBytes));
-        }
+        valueBytes.updateTemperature(temperature);
+        ble.gattServer().write(tempMeasurement.getValueHandle(), valueBytes.getPointer(), sizeof(TemperatureValueBytes));
     }
 
     /**
@@ -145,5 +145,7 @@ protected:
     ReadOnlyGattCharacteristic<TemperatureValueBytes>  tempMeasurement;
     ReadOnlyGattCharacteristic<uint8_t>                tempLocation;
 };
+
+#endif // BLE_FEATURE_GATT_SERVER
 
 #endif /* #ifndef __BLE_HEALTH_THERMOMETER_SERVICE_H__*/

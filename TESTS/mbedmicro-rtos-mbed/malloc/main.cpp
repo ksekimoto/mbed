@@ -19,9 +19,9 @@
 #include "unity/unity.h"
 
 
-#if defined(MBED_RTOS_SINGLE_THREAD)
-  #error [NOT_SUPPORTED] test not supported
-#endif
+#if !DEVICE_USTICKER
+#error [NOT_SUPPORTED] test not supported
+#else
 
 using utest::v1::Case;
 
@@ -32,6 +32,12 @@ volatile bool thread_should_continue = true;
 #define THREAD_MALLOC_SIZE  100
 
 #if defined(__CORTEX_A9)
+#define THREAD_STACK_SIZE   512
+#elif defined(__CORTEX_M23) || defined(__CORTEX_M33)
+#define THREAD_STACK_SIZE   512
+#elif defined(TARGET_ARM_FM)
+#define THREAD_STACK_SIZE   512
+#elif defined(TARGET_CY8CKIT_062_WIFI_BT_PSA)
 #define THREAD_STACK_SIZE   512
 #else
 #define THREAD_STACK_SIZE   256
@@ -53,13 +59,13 @@ void task_using_malloc(void)
         free(data);
     }
 }
-
 /** Test for multithreaded heap allocations
 
     Given multiple threads are started in parallel
     When each of the threads allocate memory
     Then the memory allocation succeed and @a malloc return valid memory
  */
+#if defined(MBED_CONF_RTOS_PRESENT)
 void test_multithread_allocation(void)
 {
     // static stack for threads to reduce heap usage on devices with small RAM
@@ -82,7 +88,7 @@ void test_multithread_allocation(void)
 
     // Give the test time to run
     while (test_time--) {
-        Thread::wait(1000);
+        ThisThread::sleep_for(1000);
     }
 
     // Join and delete all threads
@@ -95,6 +101,45 @@ void test_multithread_allocation(void)
         }
     }
     TEST_ASSERT_FALSE(thread_alloc_failure);
+}
+#endif
+
+/** Test for multiple heap alloc and free calls */
+#define ALLOC_ARRAY_SIZE    100
+#define ALLOC_LOOP          20
+#define SIZE_INCREMENTS     1023
+#define SIZE_MODULO         31
+
+void test_alloc_and_free(void)
+{
+    void *array[ALLOC_ARRAY_SIZE];
+    void *data = NULL;
+    long total_allocated = 0;
+    int count = 0;
+    int size = SIZE_INCREMENTS;
+    int loop = ALLOC_LOOP;
+    while (loop) {
+        data = count < ALLOC_ARRAY_SIZE ? malloc(size) : NULL;
+        if (NULL != data) {
+            array[count++] = data;
+            memset((void *)data, 0xdeadbeef, size);
+            total_allocated += size;
+            size += SIZE_INCREMENTS;
+            if (size > 10000) {
+                size %= SIZE_MODULO;
+            }
+        } else {
+            for (int i = 0; i < count; i++) {
+                free(array[i]);
+                array[i] = NULL;
+            }
+            loop--;
+            printf("Total size dynamically allocated: %luB\n", total_allocated);
+            total_allocated = 0;
+            count = 0;
+            continue;
+        }
+    }
 }
 
 /** Test for large heap allocation
@@ -132,7 +177,7 @@ void test_zero_allocation(void)
     void *data = NULL;
 
     data = malloc(0);
-    if(data != NULL) {
+    if (data != NULL) {
         free(data);
     }
     TEST_ASSERT_MESSAGE(true, "malloc(0) succeed - no undefined behaviour happens");
@@ -156,13 +201,16 @@ void test_null_free(void)
 Case cases[] = {
     Case("Test 0 size allocation", test_zero_allocation),
     Case("Test NULL pointer free", test_null_free),
+#if defined(MBED_CONF_RTOS_PRESENT)
     Case("Test multithreaded allocations", test_multithread_allocation),
-    Case("Test large allocation", test_big_allocation)
+#endif
+    Case("Test large allocation", test_big_allocation),
+    Case("Test multiple alloc and free calls", test_alloc_and_free)
 };
 
 utest::v1::status_t greentea_test_setup(const size_t number_of_cases)
 {
-    GREENTEA_SETUP(test_timeout, "timing_drift_auto");
+    GREENTEA_SETUP(test_timeout, "default_auto");
     return utest::v1::greentea_test_setup_handler(number_of_cases);
 }
 
@@ -172,3 +220,5 @@ int main()
 {
     return !utest::v1::Harness::run(specification);
 }
+
+#endif // defined(MBED_RTOS_SINGLE_THREAD) || !DEVICE_USTICKER

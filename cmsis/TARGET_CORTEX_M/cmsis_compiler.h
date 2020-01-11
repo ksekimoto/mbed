@@ -1,11 +1,11 @@
 /**************************************************************************//**
  * @file     cmsis_compiler.h
  * @brief    CMSIS compiler generic header file
- * @version  V5.0.2
- * @date     13. February 2017
+ * @version  V5.1.0
+ * @date     09. October 2018
  ******************************************************************************/
 /*
- * Copyright (c) 2009-2017 ARM Limited. All rights reserved.
+ * Copyright (c) 2009-2018 Arm Limited. All rights reserved.
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -28,16 +28,22 @@
 #include <stdint.h>
 
 /*
- * ARM Compiler 4/5
+ * Arm Compiler 4/5
  */
 #if   defined ( __CC_ARM )
   #include "cmsis_armcc.h"
 
 
 /*
- * ARM Compiler 6 (armclang)
+ * Arm Compiler 6.6 LTM (armclang)
  */
-#elif defined (__ARMCC_VERSION) && (__ARMCC_VERSION >= 6010050)
+#elif defined (__ARMCC_VERSION) && (__ARMCC_VERSION >= 6010050) && (__ARMCC_VERSION < 6100100)
+  #include "cmsis_armclang_ltm.h"
+
+  /*
+ * Arm Compiler above 6.10.1 (armclang)
+ */
+#elif defined (__ARMCC_VERSION) && (__ARMCC_VERSION >= 6100100)
   #include "cmsis_armclang.h"
 
 
@@ -54,9 +60,9 @@
 #elif defined ( __ICCARM__ )
   #include <cmsis_iccarm.h>
 
-  
+
 /*
- * TI ARM Compiler
+ * TI Arm Compiler
  */
 #elif defined ( __TI_ARM__ )
   #include <cmsis_ccs.h>
@@ -69,6 +75,9 @@
   #endif
   #ifndef   __STATIC_INLINE
     #define __STATIC_INLINE                        static inline
+  #endif
+  #ifndef   __STATIC_FORCEINLINE
+    #define __STATIC_FORCEINLINE                   __STATIC_INLINE
   #endif
   #ifndef   __NO_RETURN
     #define __NO_RETURN                            __attribute__((noreturn))
@@ -112,8 +121,7 @@
     #define __ALIGNED(x)                           __attribute__((aligned(x)))
   #endif
   #ifndef   __RESTRICT
-    #warning No compiler specific solution for __RESTRICT. __RESTRICT is ignored.
-    #define __RESTRICT
+    #define __RESTRICT                             __restrict
   #endif
 
 
@@ -135,6 +143,9 @@
   #endif
   #ifndef   __STATIC_INLINE
     #define __STATIC_INLINE                        static inline
+  #endif
+  #ifndef   __STATIC_FORCEINLINE
+    #define __STATIC_FORCEINLINE                   __STATIC_INLINE
   #endif
   #ifndef   __NO_RETURN
     #define __NO_RETURN                            __attribute__((noreturn))
@@ -197,6 +208,9 @@
   #endif
   #ifndef   __STATIC_INLINE
     #define __STATIC_INLINE                        static inline
+  #endif
+  #ifndef   __STATIC_FORCEINLINE
+    #define __STATIC_FORCEINLINE                   __STATIC_INLINE
   #endif
   #ifndef   __NO_RETURN
     // NO RETURN is automatically detected hence no warning here

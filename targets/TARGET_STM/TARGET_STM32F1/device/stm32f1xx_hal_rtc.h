@@ -2,8 +2,6 @@
   ******************************************************************************
   * @file    stm32f1xx_hal_rtc.h
   * @author  MCD Application Team
-  * @version V1.1.0
-  * @date    14-April-2017
   * @brief   Header file of RTC HAL module.
   ******************************************************************************
   * @attention
@@ -520,6 +518,9 @@ HAL_StatusTypeDef HAL_RTC_SetTime(RTC_HandleTypeDef *hrtc, RTC_TimeTypeDef *sTim
 HAL_StatusTypeDef HAL_RTC_GetTime(RTC_HandleTypeDef *hrtc, RTC_TimeTypeDef *sTime, uint32_t Format);
 HAL_StatusTypeDef HAL_RTC_SetDate(RTC_HandleTypeDef *hrtc, RTC_DateTypeDef *sDate, uint32_t Format);
 HAL_StatusTypeDef HAL_RTC_GetDate(RTC_HandleTypeDef *hrtc, RTC_DateTypeDef *sDate, uint32_t Format);
+
+uint32_t          RTC_ReadTimeCounter(RTC_HandleTypeDef* hrtc);
+HAL_StatusTypeDef RTC_WriteTimeCounter(RTC_HandleTypeDef* hrtc, uint32_t TimeCounter);
 /**
   * @}
   */

@@ -17,6 +17,8 @@
 #ifndef MBED_MBED_RTX_H
 #define MBED_MBED_RTX_H
 
+#include <stdint.h>
+
 #if defined(TARGET_LPC11U68)
 
 #ifndef INITIAL_SP
@@ -24,6 +26,7 @@
 #endif
 
 #elif defined(TARGET_LPC11U24)        \
+     || defined(TARGET_LPC11CXX)  \
      || defined(TARGET_LPC11U35_401)  \
      || defined(TARGET_LPC11U35_501)  \
      || defined(TARGET_LPCCAPPUCCINO)
@@ -86,10 +89,25 @@
 #define INITIAL_SP              (0x20010000UL)
 #endif
 
-#elif defined(TARGET_LPC546XX)
+#elif defined(TARGET_MCU_LPC546XX)
 
 #ifndef INITIAL_SP
 #define INITIAL_SP              (0x20028000UL)
+#endif
+
+#elif defined(TARGET_MIMXRT1050_EVK)
+
+#if defined(__ARMCC_VERSION)
+extern uint32_t               Image$$ARM_LIB_HEAP$$ZI$$Base[];
+extern uint32_t               Image$$ARM_LIB_HEAP$$ZI$$Length[];
+#define HEAP_START            Image$$ARM_LIB_HEAP$$ZI$$Base
+#define HEAP_SIZE             Image$$ARM_LIB_HEAP$$ZI$$Length
+#elif defined(__GNUC__)
+    /* No region declarations needed */
+#elif defined(__ICCARM__)
+    /* No region declarations needed */
+#else
+    #error "no toolchain defined"
 #endif
 
 #endif

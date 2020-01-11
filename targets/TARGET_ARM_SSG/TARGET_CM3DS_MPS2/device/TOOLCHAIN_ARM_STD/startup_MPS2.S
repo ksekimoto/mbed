@@ -1,7 +1,7 @@
 /*
  * MPS2 CMSIS Library
  *
- * Copyright (c) 2009-2017 ARM Limited. All rights reserved.
+ * Copyright (c) 2009-2018 ARM Limited. All rights reserved.
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -16,15 +16,11 @@
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
- *
- * This file is derivative of CMSIS V5.00 startup_ARMCM3.s
- *
-//-------- <<< Use Configuration Wizard in Context Menu >>> ------------------
  */
 
-
-__initial_sp        EQU     0x20020000  ; Top of RAM
+/*
+ * This file is derivative of CMSIS V5.00 startup_ARMCM3.s
+ */
 
                 PRESERVE8
                 THUMB
@@ -36,8 +32,9 @@ __initial_sp        EQU     0x20020000  ; Top of RAM
                 EXPORT  __Vectors
                 EXPORT  __Vectors_End
                 EXPORT  __Vectors_Size
+                IMPORT  |Image$$ARM_LIB_STACK$$ZI$$Limit|
 
-__Vectors       DCD     __initial_sp              ; Top of Stack
+__Vectors       DCD     |Image$$ARM_LIB_STACK$$ZI$$Limit| ; Top of Stack
                 DCD     Reset_Handler             ; Reset Handler
                 DCD     NMI_Handler               ; NMI Handler
                 DCD     HardFault_Handler         ; Hard Fault Handler

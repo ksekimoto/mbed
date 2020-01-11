@@ -13,15 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#if defined(MBED_RTOS_SINGLE_THREAD) || !defined(MBED_CONF_RTOS_PRESENT)
+#error [NOT_SUPPORTED] Condition variable test cases require RTOS with multithread to run
+#else
+
+#if !DEVICE_USTICKER
+#error [NOT_SUPPORTED] UsTicker need to be enabled for this test.
+#else
+
 #include "mbed.h"
 #include "greentea-client/test_env.h"
 #include "unity.h"
 #include "utest.h"
 #include "rtos.h"
-
-#if defined(MBED_RTOS_SINGLE_THREAD)
-  #error [NOT_SUPPORTED] test not supported
-#endif
 
 using namespace utest::v1;
 
@@ -184,3 +188,6 @@ int main()
 {
     return !Harness::run(specification);
 }
+
+#endif // !DEVICE_USTICKER
+#endif // defined(MBED_RTOS_SINGLE_THREAD) || !defined(MBED_CONF_RTOS_PRESENT)

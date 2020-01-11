@@ -13,11 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include "i2c_api.h"
+
+#if DEVICE_I2C
 
 #include "device.h"
 #include "buffer.h"
 #include "dma_api.h"
-#include "i2c_api.h"
 #include "PeripheralPins.h"
 #include "twi.h"
 #include "pdc.h"
@@ -425,6 +427,26 @@ int  i2c_byte_write(i2c_t *obj, int data)
     return ACK;
 }
 
+const PinMap *i2c_master_sda_pinmap()
+{
+    return PinMap_I2C_SDA;
+}
+
+const PinMap *i2c_master_scl_pinmap()
+{
+    return PinMap_I2C_SCL;
+}
+
+const PinMap *i2c_slave_sda_pinmap()
+{
+    return PinMap_I2C_SDA;
+}
+
+const PinMap *i2c_slave_scl_pinmap()
+{
+    return PinMap_I2C_SCL;
+}
+
 /**@}*/
 
 #if DEVICE_I2CSLAVE
@@ -713,3 +735,5 @@ void i2c_abort_asynch(i2c_t *obj)
 }
 
 #endif
+
+#endif  // #if DEVICE_I2C

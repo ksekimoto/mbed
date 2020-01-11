@@ -34,29 +34,32 @@
 #include "cmsis.h"
 #include "pinmap.h"
 #include "mbed_error.h"
+#include "mbed_debug.h"
 #include "PeripheralPins.h"
-#include <stdbool.h>
 
-void analogin_init(analogin_t *obj, PinName pin)
+#if STATIC_PINMAP_READY
+#define ANALOGIN_INIT_DIRECT analogin_init_direct
+void analogin_init_direct(analogin_t *obj, const PinMap *pinmap)
+#else
+#define ANALOGIN_INIT_DIRECT _analogin_init_direct
+static void _analogin_init_direct(analogin_t *obj, const PinMap *pinmap)
+#endif
 {
-    static bool adc_calibrated = false;
-    uint32_t function = (uint32_t)NC;
+    uint32_t function = (uint32_t)pinmap->function;
+
+    // Get the peripheral name from the pin and assign it to the object
+    obj->handle.Instance = (ADC_TypeDef *)pinmap->peripheral;
 
     // ADC Internal Channels "pins"  (Temperature, Vref, Vbat, ...)
     //   are described in PinNames.h and PeripheralPins.c
     //   Pin value must be between 0xF0 and 0xFF
-    if ((pin < 0xF0) || (pin >= 0x100)) {
+    if ((pinmap->pin < 0xF0) || (pinmap->pin >= 0x100)) {
         // Normal channels
-        // Get the peripheral name from the pin and assign it to the object
-        obj->handle.Instance = (ADC_TypeDef *)pinmap_peripheral(pin, PinMap_ADC);
-        // Get the functions (adc channel) from the pin and assign it to the object
-        function = pinmap_function(pin, PinMap_ADC);
         // Configure GPIO
-        pinmap_pinout(pin, PinMap_ADC);
+        pin_function(pinmap->pin, pinmap->function);
+        pin_mode(pinmap->pin, PullNone);
     } else {
         // Internal channels
-        obj->handle.Instance = (ADC_TypeDef *)pinmap_peripheral(pin, PinMap_ADC_Internal);
-        function = pinmap_function(pin, PinMap_ADC_Internal);
         // No GPIO configuration for internal channels
     }
     MBED_ASSERT(obj->handle.Instance != (ADC_TypeDef *)NC);
@@ -65,7 +68,7 @@ void analogin_init(analogin_t *obj, PinName pin)
     obj->channel = STM_PIN_CHANNEL(function);
 
     // Save pin number for the read function
-    obj->pin = pin;
+    obj->pin = pinmap->pin;
 
     // Configure ADC object structures
     obj->handle.State = HAL_ADC_STATE_RESET;
@@ -73,7 +76,7 @@ void analogin_init(analogin_t *obj, PinName pin)
     obj->handle.Init.Resolution            = ADC_RESOLUTION_12B;
     obj->handle.Init.DataAlign             = ADC_DATAALIGN_RIGHT;
     obj->handle.Init.ScanConvMode          = DISABLE;
-    obj->handle.Init.EOCSelection          = EOC_SINGLE_CONV;
+    obj->handle.Init.EOCSelection          = ADC_EOC_SINGLE_CONV;
     obj->handle.Init.LowPowerAutoWait      = DISABLE;
     obj->handle.Init.ContinuousConvMode    = DISABLE;
     obj->handle.Init.NbrOfConversion       = 1;
@@ -82,7 +85,7 @@ void analogin_init(analogin_t *obj, PinName pin)
     obj->handle.Init.ExternalTrigConv      = ADC_EXTERNALTRIGCONV_T1_CC1;
     obj->handle.Init.ExternalTrigConvEdge  = ADC_EXTERNALTRIGCONVEDGE_NONE;
     obj->handle.Init.DMAContinuousRequests = DISABLE;
-    obj->handle.Init.Overrun               = OVR_DATA_OVERWRITTEN;
+    obj->handle.Init.Overrun               = ADC_OVR_DATA_OVERWRITTEN;
 
 #if defined(ADC1)
     if ((ADCName)obj->handle.Instance == ADC_1) {
@@ -106,14 +109,30 @@ void analogin_init(analogin_t *obj, PinName pin)
 #endif
 
     if (HAL_ADC_Init(&obj->handle) != HAL_OK) {
-        error("Cannot initialize ADC");
+        error("Cannot initialize ADC\n");
     }
 
-    // ADC calibration is done only once
-    if (!adc_calibrated) {
-        adc_calibrated = true;
+    if (!HAL_ADCEx_Calibration_GetValue(&obj->handle, ADC_SINGLE_ENDED)) {
         HAL_ADCEx_Calibration_Start(&obj->handle, ADC_SINGLE_ENDED);
     }
+}
+
+void analogin_init(analogin_t *obj, PinName pin)
+{
+    int peripheral;
+    int function;
+
+    if ((pin < 0xF0) || (pin >= 0x100)) {
+        peripheral = (int)pinmap_peripheral(pin, PinMap_ADC);
+        function = (int)pinmap_find_function(pin, PinMap_ADC);
+    } else {
+        peripheral = (int)pinmap_peripheral(pin, PinMap_ADC_Internal);
+        function = (int)pinmap_find_function(pin, PinMap_ADC_Internal);
+    }
+
+    const PinMap static_pinmap = {pin, peripheral, function};
+
+    ANALOGIN_INIT_DIRECT(obj, &static_pinmap);
 }
 
 uint16_t adc_read(analogin_t *obj)
@@ -171,31 +190,76 @@ uint16_t adc_read(analogin_t *obj)
             sConfig.Channel = ADC_CHANNEL_14;
             break;
         case 15:
-            sConfig.Channel = ADC_CHANNEL_15;
+            if ((ADCName)obj->handle.Instance == ADC_1) {
+                sConfig.Channel = ADC_CHANNEL_VOPAMP1;
+                sConfig.SamplingTime = ADC_SAMPLETIME_181CYCLES_5;
+            } else {
+                sConfig.Channel = ADC_CHANNEL_15;
+            }
             break;
         case 16:
-            sConfig.Channel = ADC_CHANNEL_16;
+            if ((ADCName)obj->handle.Instance == ADC_1) {
+                sConfig.Channel = ADC_CHANNEL_TEMPSENSOR;
+                sConfig.SamplingTime = ADC_SAMPLETIME_181CYCLES_5;
+            } else {
+                sConfig.Channel = ADC_CHANNEL_16;
+            }
             break;
         case 17:
-            sConfig.Channel = ADC_CHANNEL_17;
+            sConfig.SamplingTime = ADC_SAMPLETIME_181CYCLES_5;
+            if ((ADCName)obj->handle.Instance == ADC_1) {
+                sConfig.Channel = ADC_CHANNEL_VBAT;
+            }
+#if defined(ADC2)
+            if ((ADCName)obj->handle.Instance == ADC_2) {
+                sConfig.Channel = ADC_CHANNEL_VOPAMP2;
+            }
+#endif
+#if defined(ADC3)
+            if ((ADCName)obj->handle.Instance == ADC_3) {
+                sConfig.Channel = ADC_CHANNEL_VOPAMP3;
+            }
+#endif
+#if defined(ADC4)
+            if ((ADCName)obj->handle.Instance == ADC_4) {
+                sConfig.Channel = ADC_CHANNEL_VOPAMP4;
+            }
+#endif
             break;
         case 18:
-            sConfig.Channel = ADC_CHANNEL_18;
+            sConfig.SamplingTime = ADC_SAMPLETIME_181CYCLES_5;
+            sConfig.Channel = ADC_CHANNEL_VREFINT;
             break;
         default:
             return 0;
     }
 
-    HAL_ADC_ConfigChannel(&obj->handle, &sConfig);
-
-    HAL_ADC_Start(&obj->handle); // Start conversion
-
-    // Wait end of conversion and get value
-    if (HAL_ADC_PollForConversion(&obj->handle, 10) == HAL_OK) {
-        return (uint16_t)HAL_ADC_GetValue(&obj->handle);
-    } else {
-        return 0;
+    if (HAL_ADC_ConfigChannel(&obj->handle, &sConfig) != HAL_OK) {
+        debug("HAL_ADC_ConfigChannel issue\n");;
     }
+
+    if (HAL_ADC_Start(&obj->handle) != HAL_OK) {
+        debug("HAL_ADC_Start issue\n");;
+    }
+
+    uint16_t MeasuredValue = 0;
+
+    if (HAL_ADC_PollForConversion(&obj->handle, 10) == HAL_OK) {
+        MeasuredValue = (uint16_t)HAL_ADC_GetValue(&obj->handle);
+    } else {
+        debug("HAL_ADC_PollForConversion issue\n");
+    }
+    LL_ADC_SetCommonPathInternalCh(__LL_ADC_COMMON_INSTANCE((&obj->handle)->Instance), LL_ADC_PATH_INTERNAL_NONE);
+    if (HAL_ADC_Stop(&obj->handle) != HAL_OK) {
+        debug("HAL_ADC_Stop issue\n");;
+    }
+
+    return MeasuredValue;
+}
+
+const PinMap *analogin_pinmap()
+{
+    return PinMap_ADC;
 }
 
 #endif

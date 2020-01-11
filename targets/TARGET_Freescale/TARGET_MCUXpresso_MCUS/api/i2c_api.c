@@ -32,11 +32,18 @@ static I2C_Type *const i2c_addrs[] = I2C_BASE_PTRS;
 /* Array of I2C bus clock frequencies */
 static clock_name_t const i2c_clocks[] = I2C_CLOCK_FREQS;
 
-void i2c_init(i2c_t *obj, PinName sda, PinName scl)
+#if STATIC_PINMAP_READY
+#define I2C_INIT_DIRECT i2c_init_direct
+void i2c_init_direct(i2c_t *obj, const i2c_pinmap_t *pinmap)
+#else
+#define I2C_INIT_DIRECT _i2c_init_direct
+static void _i2c_init_direct(i2c_t *obj, const i2c_pinmap_t *pinmap)
+#endif
 {
-    uint32_t i2c_sda = pinmap_peripheral(sda, PinMap_I2C_SDA);
-    uint32_t i2c_scl = pinmap_peripheral(scl, PinMap_I2C_SCL);
-    obj->instance = pinmap_merge(i2c_sda, i2c_scl);
+    PORT_Type *port_addrs[] = PORT_BASE_PTRS;
+    PORT_Type *base = port_addrs[pinmap->sda_pin >> GPIO_PORT_SHIFT];
+
+    obj->instance = (uint32_t) pinmap->peripheral;
     obj->next_repeated_start = 0;
     MBED_ASSERT((int)obj->instance != NC);
 
@@ -46,16 +53,34 @@ void i2c_init(i2c_t *obj, PinName sda, PinName scl)
     I2C_MasterInit(i2c_addrs[obj->instance], &master_config, CLOCK_GetFreq(i2c_clocks[obj->instance]));
     I2C_EnableInterrupts(i2c_addrs[obj->instance], kI2C_GlobalInterruptEnable);
 
-    pinmap_pinout(sda, PinMap_I2C_SDA);
-    pinmap_pinout(scl, PinMap_I2C_SCL);
+    pin_function(pinmap->sda_pin, pinmap->sda_function);
+    pin_mode(pinmap->sda_pin, PullNone);
+    pin_function(pinmap->scl_pin, pinmap->scl_function);
+    pin_mode(pinmap->scl_pin, PullNone);
+
+    /* Enable internal pullup resistor */
+    base->PCR[pinmap->sda_pin & 0xFF] |= (PORT_PCR_PE_MASK | PORT_PCR_PS_MASK);
+    base->PCR[pinmap->scl_pin & 0xFF] |= (PORT_PCR_PE_MASK | PORT_PCR_PS_MASK);
 
 #if defined(FSL_FEATURE_PORT_HAS_OPEN_DRAIN) && FSL_FEATURE_PORT_HAS_OPEN_DRAIN
-    PORT_Type *port_addrs[] = PORT_BASE_PTRS;
-    PORT_Type *base = port_addrs[sda >> GPIO_PORT_SHIFT];
-
-    base->PCR[sda & 0xFF] |= PORT_PCR_ODE_MASK;
-    base->PCR[scl & 0xFF] |= PORT_PCR_ODE_MASK;
+    base->PCR[pinmap->sda_pin & 0xFF] |= PORT_PCR_ODE_MASK;
+    base->PCR[pinmap->scl_pin & 0xFF] |= PORT_PCR_ODE_MASK;
 #endif
+}
+
+void i2c_init(i2c_t *obj, PinName sda, PinName scl)
+{
+    uint32_t i2c_sda = pinmap_peripheral(sda, PinMap_I2C_SDA);
+    uint32_t i2c_scl = pinmap_peripheral(scl, PinMap_I2C_SCL);
+
+    int peripheral = (int)pinmap_merge(i2c_sda, i2c_scl);
+
+    int sda_function = (int)pinmap_find_function(sda, PinMap_I2C_SDA);
+    int scl_function = (int)pinmap_find_function(scl, PinMap_I2C_SCL);
+
+    const i2c_pinmap_t explicit_i2c_pinmap = {peripheral, sda, sda_function, scl, scl_function};
+
+    I2C_INIT_DIRECT(obj, &explicit_i2c_pinmap);
 }
 
 int i2c_start(i2c_t *obj)
@@ -63,16 +88,17 @@ int i2c_start(i2c_t *obj)
     I2C_Type *base = i2c_addrs[obj->instance];
     uint32_t statusFlags = I2C_MasterGetStatusFlags(base);
 
-    /* Return an error if the bus is already in use. */
+    /* Check if the bus is already in use. */
     if (statusFlags & kI2C_BusBusyFlag) {
-        return 1;
+        /* Send a repeat START signal. */
+        base->C1 |= I2C_C1_RSTA_MASK;
+    } else {
+        /* Send the START signal. */
+        base->C1 |= I2C_C1_MST_MASK | I2C_C1_TX_MASK;
     }
-    /* Send the START signal. */
-    base->C1 |= I2C_C1_MST_MASK | I2C_C1_TX_MASK;
 
 #if defined(FSL_FEATURE_I2C_HAS_DOUBLE_BUFFERING) && FSL_FEATURE_I2C_HAS_DOUBLE_BUFFERING
-    while (!(base->S2 & I2C_S2_EMPTY_MASK))
-    {
+    while (!(base->S2 & I2C_S2_EMPTY_MASK)) {
     }
 #endif /* FSL_FEATURE_I2C_HAS_DOUBLE_BUFFERING */
 
@@ -81,7 +107,6 @@ int i2c_start(i2c_t *obj)
 
 int i2c_stop(i2c_t *obj)
 {
-    obj->next_repeated_start = 0;
     if (I2C_MasterStop(i2c_addrs[obj->instance]) != kStatus_Success) {
         return 1;
     }
@@ -179,39 +204,86 @@ int i2c_byte_read(i2c_t *obj, int last)
 {
     uint8_t data;
     I2C_Type *base = i2c_addrs[obj->instance];
-    i2c_master_transfer_t master_xfer;
 
-    memset(&master_xfer, 0, sizeof(master_xfer));
-    master_xfer.slaveAddress = i2c_address;
-    master_xfer.direction = kI2C_Read;
-    master_xfer.data = &data;
-    master_xfer.dataSize = 1;
+    /* Setup the I2C peripheral to receive data. */
+    base->C1 &= ~(I2C_C1_TX_MASK | I2C_C1_TXAK_MASK);
 
-    /* The below function will issue a STOP signal at the end of the transfer.
-     * This is required by the hardware in order to receive the last byte
-     */
-    if (I2C_MasterTransferBlocking(base, &master_xfer) != kStatus_Success) {
-        return I2C_ERROR_NO_SLAVE;
+    if (last) {
+        base->C1 |= I2C_C1_TXAK_MASK; // NACK
     }
+
+    /* Read dummy to release the bus. */
+    data = base->D;
+
+    /* Wait until data transfer complete. */
+    while (!(base->S & kI2C_IntPendingFlag)) {
+    }
+
+    /* Clear the IICIF flag. */
+    base->S = kI2C_IntPendingFlag;
+
+    /* Change direction to Tx to avoid extra clocks. */
+    base->C1 |= I2C_C1_TX_MASK;
+
+    data = (base->D & 0xFF);
+
     return data;
 }
 
 int i2c_byte_write(i2c_t *obj, int data)
 {
-    status_t ret_value;
-#if FSL_I2C_DRIVER_VERSION > MAKE_VERSION(2, 0, 1)
-    ret_value = I2C_MasterWriteBlocking(i2c_addrs[obj->instance], (uint8_t *)(&data), 1, kI2C_TransferNoStopFlag);
-#else
-    ret_value = I2C_MasterWriteBlocking(i2c_addrs[obj->instance], (uint8_t *)(&data), 1);
-#endif
+    int ret_value = 1;
+    uint8_t statusFlags = 0;
+    I2C_Type *base = i2c_addrs[obj->instance];
 
-    if (ret_value == kStatus_Success) {
-        return 1;
-    } else if (ret_value == kStatus_I2C_Nak) {
-        return 0;
-    } else {
-        return 2;
+    /* Setup the I2C peripheral to transmit data. */
+    base->C1 |= I2C_C1_TX_MASK;
+
+    /* Send a byte of data. */
+    base->D = data;
+
+    /* Wait until data transfer complete. */
+    while (!(base->S & kI2C_IntPendingFlag)) {
     }
+
+    statusFlags = base->S;
+
+    /* Clear the IICIF flag. */
+    base->S = kI2C_IntPendingFlag;
+
+    /* Check if arbitration lost */
+    if (statusFlags & kI2C_ArbitrationLostFlag) {
+        base->S = kI2C_ArbitrationLostFlag;
+        ret_value = 2;
+    }
+
+    /* Check if no acknowledgement (NAK) */
+    if (statusFlags & kI2C_ReceiveNakFlag) {
+        base->S = kI2C_ReceiveNakFlag;
+        ret_value = 0;
+    }
+
+    return ret_value;
+}
+
+const PinMap *i2c_master_sda_pinmap()
+{
+    return PinMap_I2C_SDA;
+}
+
+const PinMap *i2c_master_scl_pinmap()
+{
+    return PinMap_I2C_SCL;
+}
+
+const PinMap *i2c_slave_sda_pinmap()
+{
+    return PinMap_I2C_SDA;
+}
+
+const PinMap *i2c_slave_scl_pinmap()
+{
+    return PinMap_I2C_SCL;
 }
 
 

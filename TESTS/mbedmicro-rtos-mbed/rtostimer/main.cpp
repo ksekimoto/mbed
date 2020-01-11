@@ -13,6 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+#if !defined(MBED_CONF_RTOS_PRESENT)
+#error [NOT_SUPPORTED] RTOS timer test cases require RTOS to run
+#else
+
 #include "mbed.h"
 #include "greentea-client/test_env.h"
 #include "unity.h"
@@ -28,7 +33,11 @@ using namespace utest::v1;
 
 #if RESTART_DELAY_MS >= DELAY_MS
 #error invalid RESTART_DELAY_MS value
-#endif
+#else
+
+#if !DEVICE_USTICKER
+#error [NOT_SUPPORTED] test not supported
+#else
 
 class Stopwatch: public Timer {
 private:
@@ -36,7 +45,7 @@ private:
 
 public:
     Stopwatch() :
-            Timer(), _sem(1)
+        Timer(), _sem(1)
     {
     }
 
@@ -46,7 +55,7 @@ public:
 
     void start(void)
     {
-        _sem.wait(0);
+        _sem.try_acquire();
         Timer::start();
     }
 
@@ -64,7 +73,7 @@ public:
         if (!running) {
             return 1;
         }
-        return _sem.wait(millisec);
+        return _sem.try_acquire_for(millisec);
     }
 };
 
@@ -72,20 +81,6 @@ void sem_callback(Semaphore *sem)
 {
     sem->release();
 }
-
-/* In order to successfully run this test suite when compiled with --profile=debug
- * error() has to be redefined as noop.
- *
- * RtosTimer calls RTX API which uses Event Recorder functionality. When compiled
- * with MBED_TRAP_ERRORS_ENABLED=1 (set in debug profile) EvrRtxTimerError() calls error()
- * which aborts test program.
- */
-#if defined(MBED_TRAP_ERRORS_ENABLED) && MBED_TRAP_ERRORS_ENABLED
-void error(const char* format, ...)
-{
-    (void) format;
-}
-#endif
 
 /** Test one-shot not restarted when elapsed
  *
@@ -112,8 +107,11 @@ void test_oneshot_not_restarted()
 
     slots = stopwatch.wait_until_stopped(DELAY_MS + DELTA_MS);
     TEST_ASSERT_EQUAL(0, slots);
+
+#if !MBED_TRAP_ERRORS_ENABLED
     status = rtostimer.stop();
     TEST_ASSERT_EQUAL(osErrorResource, status);
+#endif
 }
 
 /** Test periodic repeats continuously
@@ -151,8 +149,11 @@ void test_periodic_repeats()
 
     slots = stopwatch.wait_until_stopped(DELAY_MS + DELTA_MS);
     TEST_ASSERT_EQUAL(0, slots);
+
+#if !MBED_TRAP_ERRORS_ENABLED
     status = rtostimer.stop();
     TEST_ASSERT_EQUAL(osErrorResource, status);
+#endif
 }
 
 /** Test timer can be started again
@@ -173,20 +174,24 @@ void test_start_again()
     osStatus status = rtostimer.start(DELAY_MS);
     TEST_ASSERT_EQUAL(osOK, status);
 
-    int32_t slots = sem.wait(DELAY_MS + DELTA_MS);
-    TEST_ASSERT_EQUAL(1, slots);
+    bool acquired = sem.try_acquire_for(DELAY_MS + DELTA_MS);
+    TEST_ASSERT(acquired);
 
+#if !MBED_TRAP_ERRORS_ENABLED
     status = rtostimer.stop();
     TEST_ASSERT_EQUAL(osErrorResource, status);
+#endif
 
     status = rtostimer.start(DELAY_MS);
     TEST_ASSERT_EQUAL(osOK, status);
 
-    slots = sem.wait(DELAY_MS + DELTA_MS);
-    TEST_ASSERT_EQUAL(1, slots);
+    acquired = sem.try_acquire_for(DELAY_MS + DELTA_MS);
+    TEST_ASSERT(acquired);
 
+#if !MBED_TRAP_ERRORS_ENABLED
     status = rtostimer.stop();
     TEST_ASSERT_EQUAL(osErrorResource, status);
+#endif
 }
 
 /** Test timer restart updates delay
@@ -219,8 +224,10 @@ void test_restart_updates_delay()
     TEST_ASSERT_EQUAL(1, slots);
     TEST_ASSERT_INT_WITHIN(DELTA_MS, DELAY2_MS, stopwatch.read_ms());
 
+#if !MBED_TRAP_ERRORS_ENABLED
     status = rtostimer.stop();
     TEST_ASSERT_EQUAL(osErrorResource, status);
+#endif
 }
 
 /** Test timer is created in stopped state
@@ -232,8 +239,10 @@ void test_restart_updates_delay()
 void test_created_stopped()
 {
     RtosTimer rtostimer(mbed::callback(sem_callback, (Semaphore *) NULL), osTimerOnce);
+#if !MBED_TRAP_ERRORS_ENABLED
     osStatus status = rtostimer.stop();
     TEST_ASSERT_EQUAL(osErrorResource, status);
+#endif
 }
 
 /** Test one-shot can be stopped
@@ -251,17 +260,19 @@ void test_stop()
     osStatus status = rtostimer.start(DELAY_MS);
     TEST_ASSERT_EQUAL(osOK, status);
 
-    int32_t slots = sem.wait(RESTART_DELAY_MS);
-    TEST_ASSERT_EQUAL(0, slots);
+    bool acquired = sem.try_acquire_for(RESTART_DELAY_MS);
+    TEST_ASSERT_FALSE(acquired);
 
     status = rtostimer.stop();
     TEST_ASSERT_EQUAL(osOK, status);
 
-    slots = sem.wait(DELAY_MS + DELTA_MS);
-    TEST_ASSERT_EQUAL(0, slots);
+    acquired = sem.try_acquire_for(DELAY_MS + DELTA_MS);
+    TEST_ASSERT_FALSE(acquired);
 
+#if !MBED_TRAP_ERRORS_ENABLED
     status = rtostimer.stop();
     TEST_ASSERT_EQUAL(osErrorResource, status);
+#endif
 }
 
 /** Test timer started with infinite delay
@@ -281,6 +292,7 @@ void test_wait_forever()
     TEST_ASSERT_EQUAL(osOK, status);
 }
 
+#if !MBED_TRAP_ERRORS_ENABLED
 /** Test timer started with zero delay
  *
  * Given a one-shot RtosTimer
@@ -322,10 +334,11 @@ void test_isr_calls_fail()
 
     wait_ms(DELAY_MS + DELTA_MS);
 }
+#endif // !MBED_TRAP_ERRORS_ENABLED
 
 utest::v1::status_t test_setup(const size_t number_of_cases)
 {
-    GREENTEA_SETUP(5, "default_auto");
+    GREENTEA_SETUP(10, "default_auto");
     return verbose_test_setup_handler(number_of_cases);
 }
 
@@ -337,8 +350,10 @@ Case cases[] = {
     Case("Timer can be stopped", test_stop),
     Case("Timer is created in stopped state", test_created_stopped),
     Case("Timer started with infinite delay", test_wait_forever),
+#if !MBED_TRAP_ERRORS_ENABLED
     Case("Timer started with zero delay", test_no_wait),
     Case("Calls from ISR fail", test_isr_calls_fail)
+#endif
 };
 
 Specification specification(test_setup, cases);
@@ -347,3 +362,7 @@ int main()
 {
     return !Harness::run(specification);
 }
+
+#endif // !DEVICE_USTICKER
+#endif // RESTART_DELAY_MS >= DELAY_MS
+#endif

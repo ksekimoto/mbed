@@ -29,8 +29,10 @@ void wifi_connect_params_valid_secure(void)
 {
     WiFiInterface *wifi = get_interface();
 
-    if(wifi->connect(MBED_CONF_APP_WIFI_SECURE_SSID, MBED_CONF_APP_WIFI_PASSWORD, get_security()) == NSAPI_ERROR_OK) {
-        return;
+    if (wifi->connect(MBED_CONF_APP_WIFI_SECURE_SSID, MBED_CONF_APP_WIFI_PASSWORD, get_security()) == NSAPI_ERROR_OK) {
+        if (wifi->disconnect() == NSAPI_ERROR_OK) {
+            return;
+        }
     }
 
     TEST_FAIL();

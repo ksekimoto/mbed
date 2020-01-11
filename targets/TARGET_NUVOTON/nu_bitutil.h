@@ -17,9 +17,6 @@
 #ifndef NU_BIT_UTIL_H
 #define NU_BIT_UTIL_H
 
-#if defined(__ICCARM__) && defined(TARGET_M0)
-#include <arm_math.h>
-#endif
 #include "cmsis.h"
 
 #ifdef __cplusplus

@@ -34,8 +34,8 @@ static uint32_t serial_irq_ids[FSL_FEATURE_SOC_LPUART_COUNT] = {0};
 static uart_irq_handler irq_handler;
 /* Array of UART peripheral base address. */
 static LPUART_Type *const uart_addrs[] = LPUART_BASE_PTRS;
-/* Array of LPUART bus clock frequencies */
-static clock_name_t const uart_clocks[] = LPUART_CLOCK_FREQS;
+/* LPUART bus clock frequency */
+static uint32_t lpuart_src_freq;
 
 int stdio_uart_inited = 0;
 serial_t stdio_uart;
@@ -47,10 +47,11 @@ void serial_init(serial_t *obj, PinName tx, PinName rx)
     obj->index = pinmap_merge(uart_tx, uart_rx);
     MBED_ASSERT((int)obj->index != NC);
 
+    /* Set the UART clock source */
+    serial_clock_init();
+
     // since the LPuart initialization depends very much on the source clock and its
     // frequency, we do a check here and retrieve the frequency accordingly
-    // The CLOCK_SetLpuartSrc() is already done during clock init.
-    uint32_t lpuart_src_freq;
     switch (SIM->SOPT2 & SIM_SOPT2_LPUARTSRC_MASK) {
         case SIM_SOPT2_LPUARTSRC(3U): {
             lpuart_src_freq = CLOCK_GetInternalRefClkFreq();
@@ -65,9 +66,9 @@ void serial_init(serial_t *obj, PinName tx, PinName rx)
             break;
         }
         default: {
-    /* Set the LPUART clock source */
-            CLOCK_SetLpuartClock(1U);
-            lpuart_src_freq = CLOCK_GetFreq(uart_clocks[obj->index]);
+            /* Set the LPUART clock source */
+            CLOCK_SetLpuartClock(2U);
+            lpuart_src_freq = CLOCK_GetOsc0ErClkFreq();
             break;
         }
     }
@@ -106,7 +107,7 @@ void serial_free(serial_t *obj)
 
 void serial_baud(serial_t *obj, int baudrate)
 {
-    LPUART_SetBaudRate(uart_addrs[obj->index], (uint32_t)baudrate, CLOCK_GetFreq(uart_clocks[obj->index]));
+    LPUART_SetBaudRate(uart_addrs[obj->index], (uint32_t)baudrate, lpuart_src_freq);
 }
 
 void serial_format(serial_t *obj, int data_bits, SerialParity parity, int stop_bits)
@@ -153,10 +154,10 @@ static inline void uart_irq(uint32_t transmit_empty, uint32_t receive_full, uint
     }
 
     if (serial_irq_ids[index] != 0) {
-        if (transmit_empty)
+        if (transmit_empty && (LPUART_GetEnabledInterrupts(uart_addrs[index]) & kLPUART_TxDataRegEmptyInterruptEnable))
             irq_handler(serial_irq_ids[index], TxIrq);
 
-        if (receive_full)
+        if (receive_full && (LPUART_GetEnabledInterrupts(uart_addrs[index]) & kLPUART_RxDataRegFullInterruptEnable))
             irq_handler(serial_irq_ids[index], RxIrq);
     }
 }
@@ -293,6 +294,83 @@ void serial_break_set(serial_t *obj)
 void serial_break_clear(serial_t *obj)
 {
     uart_addrs[obj->index]->CTRL &= ~LPUART_CTRL_SBK_MASK;
+}
+
+const PinMap *serial_tx_pinmap()
+{
+    return PinMap_UART_TX;
+}
+
+const PinMap *serial_rx_pinmap()
+{
+    return PinMap_UART_RX;
+}
+
+const PinMap *serial_cts_pinmap()
+{
+#if !DEVICE_SERIAL_FC
+    static const PinMap PinMap_UART_CTS[] = {
+        {NC, NC, 0}
+    };
+#endif
+
+    return PinMap_UART_CTS;
+}
+
+const PinMap *serial_rts_pinmap()
+{
+#if !DEVICE_SERIAL_FC
+    static const PinMap PinMap_UART_RTS[] = {
+        {NC, NC, 0}
+    };
+#endif
+
+    return PinMap_UART_RTS;
+}
+
+static int serial_is_enabled(uint32_t uart_index)
+{
+    int clock_enabled = 0;
+    switch (uart_index) {
+        case 0:
+            clock_enabled = (SIM->SCGC5 & SIM_SCGC5_LPUART0_MASK) >> SIM_SCGC5_LPUART0_SHIFT;
+            break;
+        case 1:
+            clock_enabled = (SIM->SCGC5 & SIM_SCGC5_LPUART1_MASK) >> SIM_SCGC5_LPUART1_SHIFT;
+            break;
+        case 2:
+            clock_enabled = (SIM->SCGC5 & SIM_SCGC5_LPUART2_MASK) >> SIM_SCGC5_LPUART2_SHIFT;
+            break;
+        default:
+            break;
+    }
+
+    return clock_enabled;
+}
+
+bool serial_check_tx_ongoing()
+{
+    LPUART_Type *base;
+    int i;
+    bool uart_tx_ongoing = false;
+
+    for (i = 0; i < FSL_FEATURE_SOC_LPUART_COUNT; i++) {
+        /* First check if UART is enabled */
+        if (!serial_is_enabled(i)) {
+            /* UART is not enabled, check the next instance */
+            continue;
+        }
+
+        base = uart_addrs[i];
+
+        /* Check if data is waiting to be written out of transmit buffer */
+        if (!(kLPUART_TransmissionCompleteFlag & LPUART_GetStatusFlags((LPUART_Type *)base))) {
+            uart_tx_ongoing = true;
+            break;
+        }
+    }
+
+    return uart_tx_ongoing;
 }
 
 #endif

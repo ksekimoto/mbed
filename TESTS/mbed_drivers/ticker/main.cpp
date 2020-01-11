@@ -18,6 +18,9 @@
 #include "utest/utest.h"
 #include "unity/unity.h"
 
+#if !DEVICE_USTICKER
+#error [NOT_SUPPORTED] test not supported
+#else
 
 using utest::v1::Case;
 
@@ -38,51 +41,39 @@ volatile uint32_t multi_counter;
 DigitalOut led1(LED1);
 DigitalOut led2(LED2);
 
-Ticker *volatile ticker1;
-Ticker *volatile ticker2;
 Timer gtimer;
-
 volatile int ticker_count = 0;
-volatile bool print_tick = false;
 
-void ticker_callback_1_switch_to_2(void);
-void ticker_callback_2_switch_to_1(void);
-
-void increment_ticker_counter(void)
-{
-    ++callback_trigger_count;
-}
 
 void switch_led1_state(void)
 {
-    led1 = !led1;
+    // blink 3 times per second
+    if ((callback_trigger_count % 333) == 0) {
+        led1 = !led1;
+    }
 }
 
 void switch_led2_state(void)
 {
-    led2 = !led2;
+    // blink 3 times per second
+    // make led2 blink at the same callback_trigger_count value as led1
+    if (((callback_trigger_count - 1) % 333) == 0) {
+        led2 = !led2;
+    }
 }
 
-void ticker_callback_1_switch_to_2(void)
+void ticker_callback_1(void)
 {
     ++callback_trigger_count;
-    // If ticker is NULL then it is being or has been deleted
-    if (ticker1) {
-        ticker1->detach();
-        ticker1->attach_us(ticker_callback_2_switch_to_1, ONE_MILLI_SEC);
-    }
     switch_led1_state();
 }
 
-void ticker_callback_2_switch_to_1(void)
+void ticker_callback_2(void)
 {
     ++callback_trigger_count;
-    // If ticker is NULL then it is being or has been deleted
-    if (ticker2) {
-        ticker2->detach();
-        ticker2->attach_us(ticker_callback_1_switch_to_2, ONE_MILLI_SEC);
+    if (LED2 != NC) {
+        switch_led2_state();
     }
-    switch_led2_state();
 }
 
 
@@ -95,20 +86,19 @@ void sem_release(Semaphore *sem)
 void stop_gtimer_set_flag(void)
 {
     gtimer.stop();
-    core_util_atomic_incr_u32((uint32_t*)&ticker_callback_flag, 1);
+    core_util_atomic_incr_u32((uint32_t *)&ticker_callback_flag, 1);
 }
 
 void increment_multi_counter(void)
 {
-    core_util_atomic_incr_u32((uint32_t*)&multi_counter, 1);
+    core_util_atomic_incr_u32((uint32_t *)&multi_counter, 1);
 }
 
 
 /* Tests is to measure the accuracy of Ticker over a period of time
  *
- * 1) DUT would start to update callback_trigger_count every milli sec, in 2x callback we use 2 tickers
- *    to update the count alternatively.
- * 2) Host would query what is current count base_time, Device responds by the callback_trigger_count
+ * 1) DUT would start to update callback_trigger_count every milli sec
+ * 2) Host would query what is current count base_time, Device responds by the callback_trigger_count.
  * 3) Host after waiting for measurement stretch. It will query for device time again final_time.
  * 4) Host computes the drift considering base_time, final_time, transport delay and measurement stretch
  * 5) Finally host send the results back to device pass/fail based on tolerance.
@@ -119,9 +109,16 @@ void test_case_1x_ticker()
     char _key[11] = { };
     char _value[128] = { };
     int expected_key = 1;
+    Ticker ticker;
+
+    led1 = 1;
+    if (LED2 != NC) {
+        led2 = 1;
+    }
+    callback_trigger_count = 0;
 
     greentea_send_kv("timing_drift_check_start", 0);
-    ticker1->attach_us(&increment_ticker_counter, ONE_MILLI_SEC);
+    ticker.attach_us(&ticker_callback_1, ONE_MILLI_SEC);
 
     // wait for 1st signal from host
     do {
@@ -137,21 +134,37 @@ void test_case_1x_ticker()
     //get the results from host
     greentea_parse_kv(_key, _value, sizeof(_key), sizeof(_value));
 
-    TEST_ASSERT_EQUAL_STRING_MESSAGE("pass", _key,"Host side script reported a fail...");
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("pass", _key, "Host side script reported a fail...");
 }
 
-void test_case_2x_callbacks()
+/* Tests is to measure the accuracy of Ticker over a period of time
+ *
+ * 1) DUT would start to update callback_trigger_count every milli sec, we use 2 tickers
+ *    to update the count alternatively.
+ * 2) Host would query what is current count base_time, Device responds by the callback_trigger_count
+ * 3) Host after waiting for measurement stretch. It will query for device time again final_time.
+ * 4) Host computes the drift considering base_time, final_time, transport delay and measurement stretch
+ * 5) Finally host send the results back to device pass/fail based on tolerance.
+ * 6) More details on tests can be found in timing_drift_auto.py
+ */
+void test_case_2x_ticker()
 {
     char _key[11] = { };
     char _value[128] = { };
     int expected_key =  1;
+    Ticker ticker1, ticker2;
 
     led1 = 0;
-    led2 = 0;
+    if (LED2 != NC) {
+        led2 = 1;
+    }
     callback_trigger_count = 0;
 
+    ticker1.attach_us(ticker_callback_1, 2 * ONE_MILLI_SEC);
+    // delay second ticker to have a pair of tickers tick every one millisecond
+    wait_us(ONE_MILLI_SEC);
     greentea_send_kv("timing_drift_check_start", 0);
-    ticker1->attach_us(ticker_callback_1_switch_to_2, ONE_MILLI_SEC);
+    ticker2.attach_us(ticker_callback_2, 2 * ONE_MILLI_SEC);
 
     // wait for 1st signal from host
     do {
@@ -167,7 +180,7 @@ void test_case_2x_callbacks()
     //get the results from host
     greentea_parse_kv(_key, _value, sizeof(_key), sizeof(_value));
 
-    TEST_ASSERT_EQUAL_STRING_MESSAGE("pass", _key,"Host side script reported a fail...");
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("pass", _key, "Host side script reported a fail...");
 }
 
 /** Test many tickers run one after the other
@@ -188,10 +201,15 @@ void test_multi_ticker(void)
         ticker[i].attach_us(callback(increment_multi_counter), MULTI_TICKER_TIME_MS * 1000);
     }
 
-    Thread::wait(MULTI_TICKER_TIME_MS + extra_wait);
+    ThisThread::sleep_for(MULTI_TICKER_TIME_MS + extra_wait);
+    TEST_ASSERT_EQUAL(TICKER_COUNT, multi_counter);
+
     for (int i = 0; i < TICKER_COUNT; i++) {
-            ticker[i].detach();
+        ticker[i].detach();
     }
+    // Because detach calls schedule_interrupt in some circumstances
+    // (e.g. when head event is removed), it's good to check if
+    // no more callbacks were triggered during detaching.
     TEST_ASSERT_EQUAL(TICKER_COUNT, multi_counter);
 
     multi_counter = 0;
@@ -199,10 +217,15 @@ void test_multi_ticker(void)
         ticker[i].attach_us(callback(increment_multi_counter), (MULTI_TICKER_TIME_MS + i) * 1000);
     }
 
-    Thread::wait(MULTI_TICKER_TIME_MS + TICKER_COUNT + extra_wait);
+    ThisThread::sleep_for(MULTI_TICKER_TIME_MS + TICKER_COUNT + extra_wait);
+    TEST_ASSERT_EQUAL(TICKER_COUNT, multi_counter);
+
     for (int i = 0; i < TICKER_COUNT; i++) {
         ticker[i].detach();
     }
+    // Because detach calls schedule_interrupt in some circumstances
+    // (e.g. when head event is removed), it's good to check if
+    // no more callbacks were triggered during detaching.
     TEST_ASSERT_EQUAL(TICKER_COUNT, multi_counter);
 }
 
@@ -224,7 +247,7 @@ void test_multi_call_time(void)
 
         gtimer.start();
         ticker.attach_us(callback(stop_gtimer_set_flag), MULTI_TICKER_TIME_MS * 1000);
-        while(!ticker_callback_flag);
+        while (!ticker_callback_flag);
         time_diff = gtimer.read_us();
 
         TEST_ASSERT_UINT32_WITHIN(TOLERANCE_US, MULTI_TICKER_TIME_MS * 1000, time_diff);
@@ -240,22 +263,20 @@ void test_multi_call_time(void)
 void test_detach(void)
 {
     Ticker ticker;
-    int32_t ret;
+    bool ret;
     const float ticker_time_s = 0.1f;
     const uint32_t wait_time_ms = 500;
     Semaphore sem(0, 1);
 
     ticker.attach(callback(sem_release, &sem), ticker_time_s);
 
-    ret = sem.wait();
-    TEST_ASSERT_TRUE(ret > 0);
+    sem.acquire();
 
-    ret = sem.wait();
+    sem.acquire();
     ticker.detach(); /* cancel */
-    TEST_ASSERT_TRUE(ret > 0);
 
-    ret = sem.wait(wait_time_ms);
-    TEST_ASSERT_EQUAL(0, ret);
+    ret = sem.try_acquire_for(wait_time_ms);
+    TEST_ASSERT_FALSE(ret);
 }
 
 /** Test single callback time via attach
@@ -273,7 +294,7 @@ void test_attach_time(void)
     gtimer.reset();
     gtimer.start();
     ticker.attach(callback(stop_gtimer_set_flag), ((float)DELAY_US) / 1000000.0f);
-    while(!ticker_callback_flag);
+    while (!ticker_callback_flag);
     ticker.detach();
     const int time_diff = gtimer.read_us();
 
@@ -295,44 +316,11 @@ void test_attach_us_time(void)
     gtimer.reset();
     gtimer.start();
     ticker.attach_us(callback(stop_gtimer_set_flag), DELAY_US);
-    while(!ticker_callback_flag);
+    while (!ticker_callback_flag);
     ticker.detach();
     const int time_diff = gtimer.read_us();
 
     TEST_ASSERT_UINT64_WITHIN(TOLERANCE_US, DELAY_US, time_diff);
-}
-
-
-utest::v1::status_t one_ticker_case_setup_handler_t(const Case *const source, const size_t index_of_case)
-{
-    ticker1 = new Ticker();
-    return greentea_case_setup_handler(source, index_of_case);
-}
-
-utest::v1::status_t two_ticker_case_setup_handler_t(const Case *const source, const size_t index_of_case)
-{
-    ticker1 = new Ticker();
-    ticker2 = new Ticker();
-    return utest::v1::greentea_case_setup_handler(source, index_of_case);
-}
-
-utest::v1::status_t one_ticker_case_teardown_handler_t(const Case *const source, const size_t passed, const size_t failed, const utest::v1::failure_t reason)
-{
-    Ticker *temp1 = ticker1;
-    ticker1 = NULL;
-    delete temp1;
-    return utest::v1::greentea_case_teardown_handler(source, passed, failed, reason);
-}
-
-utest::v1::status_t two_ticker_case_teardown_handler_t(const Case *const source, const size_t passed, const size_t failed, const utest::v1::failure_t reason)
-{
-    Ticker *temp1 = ticker1;
-    Ticker *temp2 = ticker2;
-    ticker1 = NULL;
-    ticker2 = NULL;
-    delete temp1;
-    delete temp2;
-    return utest::v1::greentea_case_teardown_handler(source, passed, failed, reason);
 }
 
 
@@ -347,8 +335,11 @@ Case cases[] = {
     Case("Test detach", test_detach),
     Case("Test multi call and time measure", test_multi_call_time),
     Case("Test multi ticker", test_multi_ticker),
-    Case("Test timers: 1x ticker", one_ticker_case_setup_handler_t,test_case_1x_ticker, one_ticker_case_teardown_handler_t),
-    Case("Test timers: 2x callbacks", two_ticker_case_setup_handler_t,test_case_2x_callbacks, two_ticker_case_teardown_handler_t)
+
+#if !defined(SKIP_TIME_DRIFT_TESTS)
+    Case("Test timers: 1x ticker", test_case_1x_ticker),
+    Case("Test timers: 2x ticker", test_case_2x_ticker)
+#endif
 };
 
 utest::v1::status_t greentea_test_setup(const size_t number_of_cases)
@@ -363,3 +354,5 @@ int main()
 {
     utest::v1::Harness::run(specification);
 }
+
+#endif // !DEVICE_USTICKER

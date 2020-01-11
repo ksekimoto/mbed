@@ -136,17 +136,6 @@ struct lp_timer_s {
 };
 #endif
 
-#if DEVICE_SLEEP
-#define NUM_SLEEP_MODES 5
-typedef enum {
-    EM0 = 0,
-    EM1 = 1,
-    EM2 = 2,
-    EM3 = 3,
-    EM4 = 4
-} sleepstate_enum;
-#endif
-
 #if DEVICE_FLASH
 struct flash_s {
     MSC_TypeDef *msc;
@@ -157,6 +146,29 @@ struct flash_s {
 struct trng_s {
     TRNG_TypeDef *instance;
 };
+#endif
+
+#if DEVICE_CAN
+struct can_s {
+    CAN_TypeDef *instance;
+};
+#endif
+
+#if DEVICE_QSPI
+struct qspi_s {
+    QSPI_TypeDef *instance;
+    PinName io0;
+    PinName io1;
+    PinName io2;
+    PinName io3;
+    PinName sclk;
+    PinName ssel;
+};
+#endif
+
+#if DEVICE_CRC
+//GPCRC supports any 16-bit poly, but only the CCITT 32-bit poly
+#define HAL_CRC_IS_SUPPORTED(polynomial, width) ((width) == 16 || ((width) == 32 && (polynomial) == POLY_32BIT_ANSI))
 #endif
 
 #ifdef __cplusplus

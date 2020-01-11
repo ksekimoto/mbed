@@ -2,8 +2,6 @@
   ******************************************************************************
   * @file    stm32f1xx_hal_adc.h
   * @author  MCD Application Team
-  * @version V1.1.0
-  * @date    14-April-2017
   * @brief   Header file containing functions prototypes of ADC HAL library.
   ******************************************************************************
   * @attention
@@ -45,6 +43,10 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "stm32f1xx_hal_def.h"  
+
+/* Include low level driver */
+#include "stm32f1xx_ll_adc.h"
+
 /** @addtogroup STM32F1xx_HAL_Driver
   * @{
   */

@@ -17,7 +17,7 @@
 /**
   * This file configures the system clock as follows:
   *-----------------------------------------------------------------------------
-  * System clock source | 1- USE_PLL_HSE_EXTC (external 8 MHz clock) | CLOCK_SOURCE_USB=1
+  * System clock source | 1- USE_PLL_HSE_EXTC (external 8 MHz clock) | DEVICE_USBDEVICE=1
   *                     | 2- USE_PLL_HSE_XTAL (external 8 MHz xtal)  |
   *                     | 3- USE_PLL_HSI (internal 16 MHz)           |
   *-----------------------------------------------------------------------------
@@ -30,7 +30,7 @@
 **/
 
 #include "stm32f4xx.h"
-#include "mbed_assert.h"
+#include "mbed_error.h"
 
 /*!< Uncomment the following line if you need to relocate your vector Table in
      Internal SRAM. */
@@ -64,7 +64,7 @@ void SystemInit(void)
 {
     /* FPU settings ------------------------------------------------------------*/
 #if (__FPU_PRESENT == 1) && (__FPU_USED == 1)
-    SCB->CPACR |= ((3UL << 10*2)|(3UL << 11*2));  /* set CP10 and CP11 Full Access */
+    SCB->CPACR |= ((3UL << 10 * 2) | (3UL << 11 * 2)); /* set CP10 and CP11 Full Access */
 #endif
     /* Reset the RCC clock configuration to the default reset state ------------*/
     /* Set HSION bit */
@@ -125,8 +125,8 @@ void SetSysClock(void)
             if (SetSysClock_PLL_HSI() == 0)
 #endif
             {
-                while(1) {
-                    MBED_ASSERT(1);
+                {
+                    error("SetSysClock failed\n");
                 }
             }
         }
@@ -162,13 +162,13 @@ uint8_t SetSysClock_PLL_HSE(uint8_t bypass)
     RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
     RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
     RCC_OscInitStruct.PLL.PLLM            = 4;             // VCO input clock = 2 MHz (8 MHz / 4)
-#if (CLOCK_SOURCE_USB)
+#if (DEVICE_USBDEVICE)
     RCC_OscInitStruct.PLL.PLLN            = 192;           // VCO output clock = 384 MHz (2 MHz * 192)
-#else /* CLOCK_SOURCE_USB */
+#else /* DEVICE_USBDEVICE */
     RCC_OscInitStruct.PLL.PLLN            = 200;           // VCO output clock = 400 MHz (2 MHz * 200)
-#endif /* CLOCK_SOURCE_USB */
-    RCC_OscInitStruct.PLL.PLLP            = RCC_PLLP_DIV4; // PLLCLK = 100 MHz or 96 MHz (depending on CLOCK_SOURCE_USB)
-    RCC_OscInitStruct.PLL.PLLQ            = 8;             // USB clock = 48 MHz (CLOCK_SOURCE_USB=1)
+#endif /* DEVICE_USBDEVICE */
+    RCC_OscInitStruct.PLL.PLLP            = RCC_PLLP_DIV4; // PLLCLK = 100 MHz or 96 MHz (depending on DEVICE_USBDEVICE)
+    RCC_OscInitStruct.PLL.PLLQ            = 8;             // USB clock = 48 MHz (DEVICE_USBDEVICE=1)
     if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
         return 0; // FAIL
     }
@@ -212,17 +212,17 @@ uint8_t SetSysClock_PLL_HSI(void)
     RCC_OscInitStruct.OscillatorType      = RCC_OSCILLATORTYPE_HSI | RCC_OSCILLATORTYPE_HSE;
     RCC_OscInitStruct.HSIState            = RCC_HSI_ON;
     RCC_OscInitStruct.HSEState            = RCC_HSE_OFF;
-    RCC_OscInitStruct.HSICalibrationValue = 16;
+    RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
     RCC_OscInitStruct.PLL.PLLState        = RCC_PLL_ON;
     RCC_OscInitStruct.PLL.PLLSource       = RCC_PLLSOURCE_HSI;
     RCC_OscInitStruct.PLL.PLLM            = 8;             // VCO input clock = 2 MHz (16 MHz / 8)
-#if (CLOCK_SOURCE_USB)
+#if (DEVICE_USBDEVICE)
     RCC_OscInitStruct.PLL.PLLN            = 192;           // VCO output clock = 384 MHz (2 MHz * 192)
-#else /* CLOCK_SOURCE_USB */
+#else /* DEVICE_USBDEVICE */
     RCC_OscInitStruct.PLL.PLLN            = 200;           // VCO output clock = 400 MHz (2 MHz * 200)
-#endif /* CLOCK_SOURCE_USB */
-    RCC_OscInitStruct.PLL.PLLP            = RCC_PLLP_DIV4; // PLLCLK = 100 MHz or 96 MHz (depending on CLOCK_SOURCE_USB)
-    RCC_OscInitStruct.PLL.PLLQ            = 8;             // USB clock = 48 MHz (CLOCK_SOURCE_USB=1)
+#endif /* DEVICE_USBDEVICE */
+    RCC_OscInitStruct.PLL.PLLP            = RCC_PLLP_DIV4; // PLLCLK = 100 MHz or 96 MHz (depending on DEVICE_USBDEVICE)
+    RCC_OscInitStruct.PLL.PLLQ            = 8;             // USB clock = 48 MHz (DEVICE_USBDEVICE=1)
     if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
         return 0; // FAIL
     }

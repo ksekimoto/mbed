@@ -23,6 +23,10 @@ extern "C" {
 #endif
 
 typedef enum {
+    GPIO_X = 0, // dummy peripheral used instead of GPIO_A..GPIO_C
+} GPIOName;
+
+typedef enum {
     OSC32KCLK = 0
 } RTCName;
 
@@ -46,9 +50,7 @@ typedef enum {
     PWM_3  = (0 << TPM_SHIFT) | (2),  // TPM0 CH2
     PWM_4  = (0 << TPM_SHIFT) | (3),  // TPM0 CH3
     PWM_5  = (1 << TPM_SHIFT) | (0),  // TPM1 CH0
-    PWM_6  = (1 << TPM_SHIFT) | (1),  // TPM1 CH1
-    PWM_7  = (2 << TPM_SHIFT) | (0),  // TPM2 CH0
-    PWM_8  = (2 << TPM_SHIFT) | (1),  // TPM2 CH1
+    PWM_6  = (1 << TPM_SHIFT) | (1)   // TPM1 CH1
 } PWMName;
 
 #define ADC_INSTANCE_SHIFT           8
@@ -65,7 +67,7 @@ typedef enum {
     DAC_0 = 0
 } DACName;
 
-
+#define DEVICE_SPI_COUNT 2
 typedef enum {
     SPI_0 = 0,
     SPI_1 = 1,

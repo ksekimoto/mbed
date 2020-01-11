@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#if DEVICE_SERIAL && DEVICE_SERIAL_FC
+
 #include "H4TransportDriver.h"
 
 namespace ble {
@@ -51,7 +53,7 @@ uint16_t H4TransportDriver::write(uint8_t type, uint16_t len, uint8_t *pData)
     while (i < len + 1) {
         uint8_t to_write = i == 0 ? type : pData[i - 1];
         while (uart.writeable() == 0);
-        uart.putc(to_write);
+        uart.write(&to_write, 1);
         ++i;
     }
     return len;
@@ -60,11 +62,15 @@ uint16_t H4TransportDriver::write(uint8_t type, uint16_t len, uint8_t *pData)
 void H4TransportDriver::on_controller_irq()
 {
     while (uart.readable()) {
-        uint8_t char_received = uart.getc();
-        on_data_received(&char_received, 1);
+        uint8_t char_received;
+        if (uart.read(&char_received, 1)) {
+            on_data_received(&char_received, 1);
+        }
     }
 }
 
 } // namespace cordio
 } // namespace vendor
 } // namespace ble
+
+#endif

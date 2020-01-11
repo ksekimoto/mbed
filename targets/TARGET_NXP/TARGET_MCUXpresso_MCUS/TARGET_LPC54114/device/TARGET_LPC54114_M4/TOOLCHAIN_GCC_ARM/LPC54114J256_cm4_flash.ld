@@ -80,10 +80,11 @@ ENTRY(Reset_Handler)
 
 __ram_vector_table__ = 1;
 
-__stack_size__ = 0x2000;
-__heap_size__ = 0x4000;
+#if !defined(MBED_BOOT_STACK_SIZE)
+    #define MBED_BOOT_STACK_SIZE 0x400
+#endif
 
-HEAP_SIZE  = DEFINED(__heap_size__)  ? __heap_size__  : 0x0400;
+__stack_size__ = MBED_BOOT_STACK_SIZE;
 STACK_SIZE = DEFINED(__stack_size__) ? __stack_size__ : 0x0800;
 M_VECTOR_RAM_SIZE = DEFINED(__ram_vector_table__) ? 0xE4 : 0x0;
 RPMSG_SHMEM_SIZE = DEFINED(__use_shmem__) ? 0x1800 : 0;
@@ -106,32 +107,32 @@ SECTIONS
   /* section for storing the secondary core image */
   .m0code :
   {
-     . = ALIGN(4) ;
+     . = ALIGN(8) ;
     KEEP (*(.m0code))
      *(.m0code*)
-     . = ALIGN(4) ;
+     . = ALIGN(8) ;
   } > m_core1_image
 
   /* NOINIT section for rpmsg_sh_mem */
-  .noinit_rpmsg_sh_mem (NOLOAD) : ALIGN(4)
+  .noinit_rpmsg_sh_mem (NOLOAD) : ALIGN(8)
   {
      *(.noinit.$rpmsg_sh_mem*)
-     . = ALIGN(4) ;
+     . = ALIGN(8) ;
   } > rpmsg_sh_mem
 
   /* The startup code goes first into internal flash */
   .interrupts :
   {
     __VECTOR_TABLE = .;
-    . = ALIGN(4);
+    . = ALIGN(8);
     KEEP(*(.isr_vector))     /* Startup code */
-    . = ALIGN(4);
+    . = ALIGN(8);
   } > m_interrupts
 
   /* The program code and other data goes into internal flash */
   .text :
   {
-    . = ALIGN(4);
+    . = ALIGN(8);
     *(.text)                 /* .text sections (code) */
     *(.text*)                /* .text* sections (code) */
     *(.rodata)               /* .rodata sections (constants, strings, etc.) */
@@ -141,7 +142,7 @@ SECTIONS
     *(.eh_frame)
     KEEP (*(.init))
     KEEP (*(.fini))
-    . = ALIGN(4);
+    . = ALIGN(8);
   } > m_text
 
   .ARM.extab :
@@ -219,12 +220,12 @@ SECTIONS
 
   .interrupts_ram :
   {
-    . = ALIGN(4);
+    . = ALIGN(8);
     __VECTOR_RAM__ = .;
     __interrupts_ram_start__ = .; /* Create a global symbol at data start */
     *(.m_interrupts_ram)     /* This is a user defined section */
     . += M_VECTOR_RAM_SIZE;
-    . = ALIGN(4);
+    . = ALIGN(8);
     __interrupts_ram_end__ = .; /* Define a global symbol at data end */
   } > m_data
 
@@ -233,14 +234,14 @@ SECTIONS
 
   .data : AT(__DATA_ROM)
   {
-    . = ALIGN(4);
+    . = ALIGN(8);
     __DATA_RAM = .;
     __data_start__ = .;      /* create a global symbol at data start */
     *(.ramfunc*)             /* for functions in ram */
     *(.data)                 /* .data sections */
     *(.data*)                /* .data* sections */
     KEEP(*(.jcr*))
-    . = ALIGN(4);
+    . = ALIGN(8);
     __data_end__ = .;        /* define a global symbol at data end */
   } > m_data
 
@@ -252,13 +253,13 @@ SECTIONS
   .bss :
   {
     /* This is used by the startup in order to initialize the .bss section */
-    . = ALIGN(4);
+    . = ALIGN(8);
     __START_BSS = .;
     __bss_start__ = .;
     *(.bss)
     *(.bss*)
     *(COMMON)
-    . = ALIGN(4);
+    . = ALIGN(8);
     __bss_end__ = .;
     __END_BSS = .;
   } > m_data
@@ -269,7 +270,7 @@ SECTIONS
     __end__ = .;
     PROVIDE(end = .);
     __HeapBase = .;
-    . += HEAP_SIZE;
+    . = ORIGIN(m_data) + LENGTH(m_data) - STACK_SIZE;
     __HeapLimit = .;
     __heap_limit = .; /* Add for _sbrk */
   } > m_data

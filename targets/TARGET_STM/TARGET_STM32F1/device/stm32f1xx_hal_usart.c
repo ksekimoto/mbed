@@ -2,8 +2,6 @@
   ******************************************************************************
   * @file    stm32f1xx_hal_usart.c
   * @author  MCD Application Team
-  * @version V1.1.0
-  * @date    14-April-2017
   * @brief   USART HAL module driver.
   *          This file provides firmware functions to manage the following
   *          functionalities of the Universal Synchronous Asynchronous Receiver Transmitter (USART) peripheral:
@@ -2284,7 +2282,7 @@ static void USART_SetConfig(USART_HandleTypeDef *husart)
   CLEAR_BIT(husart->Instance->CR3, (uint32_t)(USART_CR3_RTSE | USART_CR3_CTSE));
 
   /*-------------------------- USART BRR Configuration -----------------------*/
-  if((husart->Instance == USART1))
+  if(husart->Instance == USART1)
   {
     husart->Instance->BRR = USART_BRR(HAL_RCC_GetPCLK2Freq(), husart->Init.BaudRate);
   }

@@ -1,13 +1,6 @@
-
-/** \addtogroup platform */
-/** @{*/
-/**
- * \defgroup platform_toolchain Toolchain functions
- * @{
- */
-
 /* mbed Microcontroller Library
- * Copyright (c) 2006-2013 ARM Limited
+ * Copyright (c) 2006-2019 ARM Limited
+ * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,7 +17,7 @@
 #ifndef MBED_TOOLCHAIN_H
 #define MBED_TOOLCHAIN_H
 
-#include "mbed_preprocessor.h"
+#include "platform/mbed_preprocessor.h"
 
 
 // Warning for unsupported compilers
@@ -35,6 +28,13 @@
 #warning "This compiler is not yet supported."
 #endif
 
+/** \addtogroup platform-public-api */
+/** @{*/
+
+/**
+ * \defgroup platform_toolchain Toolchain functions
+ * @{
+ */
 
 // Attributes
 
@@ -71,7 +71,11 @@
  *  @endcode
  */
 #ifndef MBED_ALIGN
-#if defined(__ICCARM__)
+#if __cplusplus >= 201103 && !defined __CC_ARM
+#define MBED_ALIGN(N) alignas(N)
+#elif __STDC_VERSION__ >= 201112 && !defined __CC_ARM
+#define MBED_ALIGN(N) _Alignas(N)
+#elif defined(__ICCARM__)
 #define MBED_ALIGN(N) _Pragma(MBED_STRINGIFY(data_alignment=N))
 #else
 #define MBED_ALIGN(N) __attribute__((aligned(N)))
@@ -144,10 +148,83 @@
 #ifndef MBED_WEAK
 #if defined(__ICCARM__)
 #define MBED_WEAK __weak
+#elif defined(__MINGW32__)
+#define MBED_WEAK
 #else
 #define MBED_WEAK __attribute__((weak))
 #endif
 #endif
+
+/** MBED_COMPILER_BARRIER
+ * Stop the compiler moving memory accesses.
+ *
+ * The barrier stops memory accesses from being moved from one side of the
+ * barrier to the other for safety against other threads and interrupts.
+ *
+ * This macro should only be used if we know only one CPU is accessing the data,
+ * or we are otherwise synchronising CPUs via acquire/release instructions.
+ * Otherwise, use MBED_BARRIER, which will act as a compiler barrier and also
+ * a CPU barrier if necessary.
+ *
+ * @internal
+ * This is not for use by normal code - it is a building block for the
+ * higher-level functions in mbed_critical.h. Higher-level lock/unlock or
+ * acquire/release APIs always provide ordering semantics, using this if
+ * necessary.
+ *
+ * @code
+ *  #include "mbed_toolchain.h"
+ *
+ *  void atomic_flag_clear_armv8(atomic_flag *flagPtr)
+ *  {
+ *      // ARMv8 LDA and STL instructions provide sequential consistency against
+ *      // other CPUs, so no CPU barrier is needed. But we still need compiler
+ *      // barriers to give us sequentially-consistent release semantics with
+ *      // respect to compiler reordering - __STLB does not currently
+ *      // include this.
+ *      MBED_COMPILER_BARRIER();
+ *      __STLB(&flagPtr->_flag, false);
+ *      MBED_COMPILER_BARRIER();
+ *  }
+ */
+#ifdef __CC_ARM
+#define MBED_COMPILER_BARRIER() __memory_changed()
+#elif defined(__GNUC__) || defined(__clang__) || defined(__ICCARM__)
+#define MBED_COMPILER_BARRIER() asm volatile("" : : : "memory")
+#else
+#error "Missing MBED_COMPILER_BARRIER implementation"
+#endif
+
+/** MBED_BARRIER
+ * Stop the compiler, and CPU if SMP, from moving memory accesses.
+ *
+ * The barrier stops memory accesses from being moved from one side of the
+ * barrier to the other for safety against other threads and interrupts,
+ * potentially on other CPUs.
+ *
+ * In a single-CPU system, this is just a compiler barrier.
+ * If we supported multiple CPUs, this would be a DMB (with implied compiler
+ * barrier).
+ *
+ * @internal
+ * This is not for use by normal code - it is a building block for the
+ * higher-level functions in mbed_critical.h. Higher-level lock/unlock or
+ * acquire/release APIs always provide ordering semantics, using this if
+ * necessary.
+ * @code
+ *  #include "mbed_toolchain.h"
+ *
+ *  void atomic_flag_clear_armv7(atomic_flag *flagPtr)
+ *  {
+ *      // ARMv7 LDR and STR instructions do not provide any ordering
+ *      // consistency against other CPUs, so explicit barrier DMBs are needed
+ *      // for a multi-CPU system, otherwise just compiler barriers for single-CPU.
+ *      MBED_BARRIER();
+ *      flagPtr->_flag = false;
+ *      MBED_BARRIER();
+ *  }
+ */
+#define MBED_BARRIER() MBED_COMPILER_BARRIER()
 
 /** MBED_PURE
  *  Hint to the compiler that a function depends only on parameters
@@ -203,11 +280,11 @@
  */
 #ifndef MBED_FORCEINLINE
 #if defined(__GNUC__) || defined(__clang__) || defined(__CC_ARM)
-#define MBED_FORCEINLINE static inline __attribute__((always_inline))
+#define MBED_FORCEINLINE inline __attribute__((always_inline))
 #elif defined(__ICCARM__)
-#define MBED_FORCEINLINE _Pragma("inline=forced") static
+#define MBED_FORCEINLINE _Pragma("inline=forced")
 #else
-#define MBED_FORCEINLINE static inline
+#define MBED_FORCEINLINE inline
 #endif
 #endif
 
@@ -224,7 +301,11 @@
  *  @endcode
  */
 #ifndef MBED_NORETURN
-#if defined(__GNUC__) || defined(__clang__) || defined(__CC_ARM)
+#if __cplusplus >= 201103
+#define MBED_NORETURN [[noreturn]]
+#elif __STDC_VERSION__ >= 201112
+#define MBED_NORETURN _Noreturn
+#elif defined(__GNUC__) || defined(__clang__) || defined(__CC_ARM)
 #define MBED_NORETURN __attribute__((noreturn))
 #elif defined(__ICCARM__)
 #define MBED_NORETURN __noreturn
@@ -235,8 +316,8 @@
 
 /** MBED_UNREACHABLE
  *  An unreachable statement. If the statement is reached,
- *  behaviour is undefined. Useful in situations where the compiler
- *  cannot deduce the unreachability of code.
+ *  behavior is undefined. Useful in situations where the compiler
+ *  cannot deduce if the code is unreachable.
  *
  *  @code
  *  #include "mbed_toolchain.h"
@@ -256,6 +337,44 @@
 #define MBED_UNREACHABLE __builtin_unreachable()
 #else
 #define MBED_UNREACHABLE while (1)
+#endif
+#endif
+
+/** MBED_FALLTHROUGH
+ *  Marks a point in a switch statement where fallthrough can occur.
+ *  Should be placed as the last statement before a label.
+ *
+ *  @code
+ *  #include "mbed_toolchain.h"
+ *
+ *  int foo(int arg) {
+ *      switch (arg) {
+ *          case 1:
+ *          case 2:
+ *          case 3:
+ *              arg *= 2;
+ *              MBED_FALLTHROUGH;
+ *          default:
+ *              return arg;
+ *      }
+ *  }
+ *  @endcode
+ */
+#ifndef MBED_FALLTHROUGH
+#if __cplusplus >= 201703
+#define MBED_FALLTHROUGH [[fallthrough]]
+#elif defined(__clang__)
+#if __cplusplus >= 201103
+#define MBED_FALLTHROUGH [[clang::fallthrough]]
+#elif __has_attribute(fallthrough)
+#define MBED_FALLTHROUGH __attribute__((fallthrough))
+#else
+#define MBED_FALLTHROUGH
+#endif
+#elif defined (__GNUC__) && !defined(__CC_ARM)
+#define MBED_FALLTHROUGH __attribute__((fallthrough))
+#else
+#define MBED_FALLTHROUGH
 #endif
 #endif
 
@@ -354,7 +473,7 @@
 
 #ifndef MBED_PRINTF_METHOD
 #if defined(__GNUC__) || defined(__CC_ARM)
-#define MBED_PRINTF_METHOD(format_idx, first_param_idx) __attribute__ ((__format__(__printf__, format_idx+1, first_param_idx+1)))
+#define MBED_PRINTF_METHOD(format_idx, first_param_idx) __attribute__ ((__format__(__printf__, format_idx+1, first_param_idx == 0 ? 0 : first_param_idx+1)))
 #else
 #define MBED_PRINTF_METHOD(format_idx, first_param_idx)
 #endif
@@ -370,11 +489,25 @@
 
 #ifndef MBED_SCANF_METHOD
 #if defined(__GNUC__) || defined(__CC_ARM)
-#define MBED_SCANF_METHOD(format_idx, first_param_idx) __attribute__ ((__format__(__scanf__, format_idx+1, first_param_idx+1)))
+#define MBED_SCANF_METHOD(format_idx, first_param_idx) __attribute__ ((__format__(__scanf__, format_idx+1, first_param_idx == 0 ? 0 : first_param_idx+1)))
 #else
 #define MBED_SCANF_METHOD(format_idx, first_param_idx)
 #endif
 #endif
+
+// Macro containing the filename part of the value of __FILE__. Defined as
+// string literal.
+#ifndef MBED_FILENAME
+#if defined(__CC_ARM)
+#define MBED_FILENAME __MODULE__
+#elif defined(__GNUC__)
+#define MBED_FILENAME (__builtin_strrchr(__FILE__, '/') ? __builtin_strrchr(__FILE__, '/') + 1 : __builtin_strrchr(__FILE__, '\\') ? __builtin_strrchr(__FILE__, '\\') + 1 : __FILE__)
+#elif defined(__ICCARM__)
+#define MBED_FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : strrchr(__FILE__, '\\') ? strrchr(__FILE__, '\\') + 1 : __FILE__)
+#else
+#define MBED_FILENAME __FILE__
+#endif
+#endif // #ifndef MBED_FILENAME
 
 // FILEHANDLE declaration
 #if defined(TOOLCHAIN_ARM)
@@ -396,6 +529,27 @@ typedef int FILEHANDLE;
 
 #ifndef EXTERN
 #define EXTERN extern
+#endif
+
+/** MBED_NONSECURE_ENTRY
+ *  Declare a function that can be called from non-secure world or secure world
+ *
+ *  @code
+ *  #include "mbed_toolchain.h"
+ *
+ *  MBED_NONSECURE_ENTRY void foo() {
+ *
+ *  }
+ *  @endcode
+ */
+#if defined (__ARM_FEATURE_CMSE) && (__ARM_FEATURE_CMSE == 3L)
+#if defined (__ICCARM__)
+#define MBED_NONSECURE_ENTRY       __cmse_nonsecure_entry
+#else
+#define MBED_NONSECURE_ENTRY       __attribute__((cmse_nonsecure_entry))
+#endif
+#else
+#define MBED_NONSECURE_ENTRY
 #endif
 
 #endif

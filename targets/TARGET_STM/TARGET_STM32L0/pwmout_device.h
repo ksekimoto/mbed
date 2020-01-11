@@ -36,7 +36,7 @@
 extern "C" {
 #endif
 
-#ifdef DEVICE_PWMOUT
+#if DEVICE_PWMOUT
 
 #define PWMOUT_INVERTED_NOT_SUPPORTED
 
@@ -55,5 +55,9 @@ typedef struct pwm_apb_map {
 extern const pwm_apb_map_t pwm_apb_map_table[];
 
 #endif // DEVICE_PWMOUT
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

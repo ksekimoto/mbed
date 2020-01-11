@@ -1,6 +1,6 @@
 /*
- * PackageLicenseDeclared: Apache-2.0
- * Copyright (c) 2017 ARM Limited
+ * Copyright (c) 2017-2019 ARM Limited
+ * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,11 +18,10 @@
 #ifndef MBED_CRITICALSECTIONLOCK_H
 #define MBED_CRITICALSECTIONLOCK_H
 
-#include "platform/mbed_critical.h"
+#include "platform/mbed_toolchain.h"
 
 namespace mbed {
-
-/** \addtogroup platform */
+/** \addtogroup platform-public-api */
 /** @{*/
 /**
  * \defgroup platform_CriticalSectionLock CriticalSectionLock functions
@@ -56,51 +55,35 @@ namespace mbed {
   */
 class CriticalSectionLock {
 public:
-    CriticalSectionLock() 
-    {
-        core_util_critical_section_enter();
-    }
+    CriticalSectionLock();
 
-    ~CriticalSectionLock() 
-    {
-        core_util_critical_section_exit();
-    }
+    ~CriticalSectionLock();
 
     /** Mark the start of a critical section
+     *  @deprecated This function is inconsistent with RAII and is being removed in the future. Replaced by static function CriticalSectionLock::enable.
      *
      */
     MBED_DEPRECATED_SINCE("mbed-os-5.8",
-            "This function is inconsistent with RAII and is being removed in the future."
-            "Replaced by static function CriticalSectionLock::enable.")
-    void lock()
-    {
-        core_util_critical_section_enter();
-    }
+                          "This function is inconsistent with RAII and is being removed in the future."
+                          "Replaced by static function CriticalSectionLock::enable.")
+    void lock();
 
     /** Mark the end of a critical section
+     *  @deprecated This function is inconsistent with RAII and is being removed in the future. Replaced by static function CriticalSectionLock::enable.
      *
      */
     MBED_DEPRECATED_SINCE("mbed-os-5.8",
-            "This function is inconsistent with RAII and is being removed in the future."
-            "Replaced by static function CriticalSectionLock::disable.")
-    void unlock()
-    {
-        core_util_critical_section_exit();
-    }
+                          "This function is inconsistent with RAII and is being removed in the future."
+                          "Replaced by static function CriticalSectionLock::disable.")
+    void unlock();
 
     /** Mark the start of a critical section
      */
-    static void enable()
-    {
-        core_util_critical_section_enter();
-    }
+    static void enable();
 
     /** Mark the end of a critical section
      */
-    static void disable()
-    {
-        core_util_critical_section_exit();
-    }
+    static void disable();
 };
 
 /**@}*/

@@ -18,7 +18,7 @@
 #define MBED_DISCOVERED_CHARACTERISTIC_DESCRIPTOR_H__
 
 #include "UUID.h"
-#include "Gap.h"
+#include "ble/Gap.h"
 #include "GattAttribute.h"
 #include "GattClient.h"
 #include "CharacteristicDescriptorDiscovery.h"
@@ -73,7 +73,7 @@ public:
      */
     DiscoveredCharacteristicDescriptor(
         GattClient *client,
-        Gap::Handle_t connectionHandle,
+        ble::connection_handle_t connectionHandle,
         GattAttribute::Handle_t attributeHandle,
         const UUID &uuid
     ) : _client(client),
@@ -109,7 +109,7 @@ public:
      * @return the connection handle to the GattServer containing this
      * descriptor.
      */
-    Gap::Handle_t getConnectionHandle() const
+    ble::connection_handle_t getConnectionHandle() const
     {
         return _connectionHandle;
     }
@@ -139,7 +139,7 @@ public:
 
 private:
     GattClient  *_client;
-    Gap::Handle_t _connectionHandle;
+    ble::connection_handle_t _connectionHandle;
     UUID _uuid;
     GattAttribute::Handle_t _gattHandle;
 };

@@ -1,13 +1,6 @@
-
-/** \addtogroup platform */
-/** @{*/
-/**
- * \defgroup platform_debug Debug functions
- * @{
- */
- 
 /* mbed Microcontroller Library
- * Copyright (c) 2006-2013 ARM Limited
+ * Copyright (c) 2006-2019 ARM Limited
+ * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,17 +20,29 @@
 #include <stdio.h>
 #include <stdarg.h>
 #endif
+#include "platform/mbed_toolchain.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+/** \addtogroup platform-public-api */
+/** @{*/
+
+/**
+ * \defgroup platform_debug Debug functions
+ * @{
+ */
+
+static inline void debug(const char *format, ...) MBED_PRINTF(1, 2);
+static inline void debug_if(int condition, const char *format, ...) MBED_PRINTF(2, 3);
 
 /** Output a debug message
  *
  * @param format printf-style format string, followed by variables
  */
-static inline void debug(const char *format, ...) {
+static inline void debug(const char *format, ...)
+{
 #if DEVICE_STDIO_MESSAGES && !defined(NDEBUG)
     va_list args;
     va_start(args, format);
@@ -55,7 +60,8 @@ static inline void debug(const char *format, ...) {
  * @param condition output only if condition is true (!= 0)
  * @param format printf-style format string, followed by variables
  */
-static inline void debug_if(int condition, const char *format, ...) {
+static inline void debug_if(int condition, const char *format, ...)
+{
 #if DEVICE_STDIO_MESSAGES && !defined(NDEBUG)
     if (condition) {
         va_list args;

@@ -1,29 +1,42 @@
 /*
- * Portions Copyright (c) 2016 - 2017 Analog Devices, Inc.
+ * Portions Copyright (c) 2016 - 2018 Analog Devices, Inc.
  *
  * Based on Device/ARM/ARMCM3/Source/GCC/gcc_arm.ld file in
  * ARM.CMSIS.4.5.0.pack.
  */
 
+#if !defined(MBED_APP_START)
+  #define MBED_APP_START 0
+#endif
+
+#if !defined(MBED_APP_SIZE)
+  #define MBED_APP_SIZE 0x40000
+#endif
+
+#define ADUCM_SECTOR_SIZE 0x800
+
 /* Linker script to configure memory regions. */
 MEMORY
 {
-  /* Flash bank0 */
-  FLASH0 (rx) : ORIGIN = 0x00000000, LENGTH = 0x800
-  /* Flash bank0 - bank127*/
-  FLASH (rx) : ORIGIN = 0x00000800, LENGTH = 256k - 0x800
+  /* The first 0x800 bytes of flash */
+  FLASH0 (rx) : ORIGIN = MBED_APP_START, LENGTH = ADUCM_SECTOR_SIZE
+  /* The rest of the flash */
+  FLASH (rx) : ORIGIN = MBED_APP_START + ADUCM_SECTOR_SIZE, LENGTH = MBED_APP_SIZE - ADUCM_SECTOR_SIZE
   /* SRAM bank 0+1 */
   DSRAM_V (rwx) : ORIGIN = 0x20000000, LENGTH = 0x200
   DSRAM_A (rwx) : ORIGIN = 0x20000200, LENGTH = 16k - 0x200
   DSRAM_C (rwx) : ORIGIN = 0x20004000, LENGTH = 16k
   /* SRAM bank 3 */
-  DSRAM_B (rwx) : ORIGIN = 0x20040000, LENGTH = 32k
+  DSRAM_B (rwx) : ORIGIN = 0x20040000, LENGTH = 28k
 }
 
 /* Library configurations */
 GROUP(libgcc.a libc.a libm.a libnosys.a)
 /* Custom stack and heap sizes */
-__stack_size__ = 0x1000;
+#if !defined(MBED_BOOT_STACK_SIZE)
+    #define MBED_BOOT_STACK_SIZE 0x400
+#endif
+__stack_size__ = MBED_BOOT_STACK_SIZE;
 __heap_size__ = 0x2000;
 
 /* select custom or default sizes for stack and heap */
@@ -118,7 +131,7 @@ SECTIONS
     /*
     .copy.table :
     {
-        . = ALIGN(4);
+        . = ALIGN(8);
         __copy_table_start__ = .;
         LONG (__etext)
         LONG (__data_start__)
@@ -136,7 +149,7 @@ SECTIONS
 
     .zero.table :
     {
-        . = ALIGN(4);
+        . = ALIGN(8);
         __zero_table_start__ = .;
         LONG (__bss_start__)
         LONG (__bss_end__ - __bss_start__)
@@ -154,13 +167,13 @@ SECTIONS
         *(vtable)
         *(.data*)
 
-        . = ALIGN(4);
+        . = ALIGN(8);
         /* preinit data */
         PROVIDE_HIDDEN (__preinit_array_start = .);
         KEEP(*(.preinit_array))
         PROVIDE_HIDDEN (__preinit_array_end = .);
 
-        . = ALIGN(4);
+        . = ALIGN(8);
         /* init data */
         PROVIDE_HIDDEN (__init_array_start = .);
         KEEP(*(SORT(.init_array.*)))
@@ -168,7 +181,7 @@ SECTIONS
         PROVIDE_HIDDEN (__init_array_end = .);
 
 
-        . = ALIGN(4);
+        . = ALIGN(8);
         /* finit data */
         PROVIDE_HIDDEN (__fini_array_start = .);
         KEEP(*(SORT(.fini_array.*)))
@@ -176,7 +189,7 @@ SECTIONS
         PROVIDE_HIDDEN (__fini_array_end = .);
 
         KEEP(*(.jcr*))
-        . = ALIGN(4);
+        . = ALIGN(8);
         /* All data end */
         __data_end__ = .;
 
@@ -184,7 +197,7 @@ SECTIONS
 
     .bss :
     {
-        . = ALIGN(4);
+        . = ALIGN(8);
         __bss_start__ = .;
         KEEP(*(.bss.gChannelControlDataArray))
         KEEP(*(.bss.thread_stack_main))
@@ -192,16 +205,16 @@ SECTIONS
         KEEP(*(.bss.os_thread_def_stack_event_loop_thread))
         *(COMMON)
         *(.bss)
-        . = ALIGN(4);
+        . = ALIGN(8);
         __bss_end__ = .;
     } > DSRAM_C
 
     .bss2 :
     {
-        . = ALIGN(4);
+        . = ALIGN(8);
         __bss2_start__ = .;
         *(.bss*)
-        . = ALIGN(4);
+        . = ALIGN(8);
         __bss2_end__ = .;
     } > DSRAM_B
 
@@ -210,13 +223,13 @@ SECTIONS
         __HeapBase = .;
         __end__ = .;
         end = __end__;
-        . += HEAP_SIZE;
+        . = ORIGIN(DSRAM_A) + LENGTH(DSRAM_A) - STACK_SIZE;
         __HeapLimit = .;
     } > DSRAM_A
 
     /* Set stack top to end of DSRAM_A, and move stack limit down by
      * size of stack_dummy section */
-    __StackTop = ORIGIN(DSRAM_C);
+    __StackTop = ORIGIN(DSRAM_A) + LENGTH(DSRAM_A);
     __StackLimit = __StackTop - STACK_SIZE;
     PROVIDE(__stack = __StackTop);
 

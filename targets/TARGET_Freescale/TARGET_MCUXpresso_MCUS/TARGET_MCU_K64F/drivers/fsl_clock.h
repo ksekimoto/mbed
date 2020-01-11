@@ -1,81 +1,16 @@
 /*
  * Copyright (c) 2015, Freescale Semiconductor, Inc.
+ * Copyright (c) 2016 - 2017 , NXP
  * All rights reserved.
  *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
  *
- * o Redistributions of source code must retain the above copyright notice, this list
- *   of conditions and the following disclaimer.
- *
- * o Redistributions in binary form must reproduce the above copyright notice, this
- *   list of conditions and the following disclaimer in the documentation and/or
- *   other materials provided with the distribution.
- *
- * o Neither the name of Freescale Semiconductor, Inc. nor the names of its
- *   contributors may be used to endorse or promote products derived from this
- *   software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
- * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
- * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * SPDX-License-Identifier: BSD-3-Clause
  */
 
 #ifndef _FSL_CLOCK_H_
 #define _FSL_CLOCK_H_
 
-#include "core_cmSecureAccess.h"
 #include "fsl_common.h"
-
-#ifdef FEATURE_UVISOR
-
-/* We cannot use the register gateway to secure this access,
- * since some accesses use dynamically computed addresses and
- * values, which are not supported by the register gateway.
- * Therefore, these accesses are implemented using the uVisor
- * secure access.
- */
-#define __FSL_CLOCK_SECURE_WRITE(addr, val) \
-    ADDRESS_WRITE(*addr, addr, val)
-
-#define __FSL_CLOCK_SECURE_READ(addr) \
-    ADDRESS_READ(*addr, addr)
-
-#define __FSL_CLOCK_SECURE_BITS_SET(addr, mask) \
-    __FSL_CLOCK_SECURE_WRITE(addr, __FSL_CLOCK_SECURE_READ(addr) | (mask))
-
-#define __FSL_CLOCK_SECURE_BITS_CLEAR(addr, mask) \
-    __FSL_CLOCK_SECURE_WRITE(addr, __FSL_CLOCK_SECURE_READ(addr) & ~(mask))
-
-#define __FSL_CLOCK_SECURE_BITS_SET_VALUE(addr, mask, val) \
-    __FSL_CLOCK_SECURE_WRITE(addr, (__FSL_CLOCK_SECURE_READ(addr) & ~(mask)) | ((val) & (mask)))
-
-#else
-
-/* Fallback implementation. */
-#define __FSL_CLOCK_SECURE_WRITE(addr, val) \
-    SECURE_WRITE(addr, val)
-
-#define __FSL_CLOCK_SECURE_READ(addr) \
-    SECURE_READ(addr)
-
-#define __FSL_CLOCK_SECURE_BITS_SET(addr, mask) \
-    SECURE_BITS_SET(addr, mask)
-
-#define __FSL_CLOCK_SECURE_BITS_CLEAR(addr, mask) \
-    SECURE_BITS_CLEAR(addr, mask)
-
-#define __FSL_CLOCK_SECURE_BITS_SET_VALUE(addr, mask, val) \
-    SECURE_BITS_SET_VALUE(addr, mask, val)
-
-#endif
 
 /*! @addtogroup clock */
 /*! @{ */
@@ -83,14 +18,32 @@
 /*! @file */
 
 /*******************************************************************************
- * Definitions
+ * Configurations
  ******************************************************************************/
+
+/*! @brief Configures whether to check a parameter in a function.
+ *
+ * Some MCG settings must be changed with conditions, for example:
+ *  1. MCGIRCLK settings, such as the source, divider, and the trim value should not change when
+ *     MCGIRCLK is used as a system clock source.
+ *  2. MCG_C7[OSCSEL] should not be changed  when the external reference clock is used
+ *     as a system clock source. For example, in FBE/BLPE/PBE modes.
+ *  3. The users should only switch between the supported clock modes.
+ *
+ * MCG functions check the parameter and MCG status before setting, if not allowed
+ * to change, the functions return error. The parameter checking increases code size,
+ * if code size is a critical requirement, change #MCG_CONFIG_CHECK_PARAM to 0 to
+ * disable parameter checking.
+ */
+#ifndef MCG_CONFIG_CHECK_PARAM
+#define MCG_CONFIG_CHECK_PARAM 0U
+#endif
 
 /*! @brief Configure whether driver controls clock
  *
  * When set to 0, peripheral drivers will enable clock in initialize function
  * and disable clock in de-initialize function. When set to 1, peripheral
- * driver will not control the clock, application could contol the clock out of
+ * driver will not control the clock, application could control the clock out of
  * the driver.
  *
  * @note All drivers share this feature switcher. If it is set to 1, application
@@ -100,10 +53,14 @@
 #define FSL_SDK_DISABLE_DRIVER_CLOCK_CONTROL 0
 #endif
 
+/*******************************************************************************
+ * Definitions
+ ******************************************************************************/
+
 /*! @name Driver version */
 /*@{*/
-/*! @brief CLOCK driver version 2.2.0. */
-#define FSL_CLOCK_DRIVER_VERSION (MAKE_VERSION(2, 2, 0))
+/*! @brief CLOCK driver version 2.2.1. */
+#define FSL_CLOCK_DRIVER_VERSION (MAKE_VERSION(2, 2, 1))
 /*@}*/
 
 /*! @brief External XTAL0 (OSC0) clock frequency.
@@ -120,7 +77,7 @@
  * OSC0 using the CLOCK_InitOsc0. All other cores need to call the CLOCK_SetXtal0Freq
  * to get a valid clock frequency.
  */
-extern uint32_t g_xtal0Freq;
+extern volatile uint32_t g_xtal0Freq;
 
 /*! @brief External XTAL32/EXTAL32/RTC_CLKIN clock frequency.
  *
@@ -131,7 +88,7 @@ extern uint32_t g_xtal0Freq;
  * the clock. All other cores need to call the CLOCK_SetXtal32Freq
  * to get a valid clock frequency.
  */
-extern uint32_t g_xtal32Freq;
+extern volatile uint32_t g_xtal32Freq;
 
 /*! @brief IRC48M clock frequency in Hz. */
 #define MCG_INTERNAL_IRC_48M 48000000U
@@ -237,9 +194,9 @@ extern uint32_t g_xtal32Freq;
     }
 
 /*! @brief Clock ip name array for MPU. */
-#define MPU_CLOCKS  \
-    {               \
-        kCLOCK_Mpu0 \
+#define SYSMPU_CLOCKS  \
+    {                  \
+        kCLOCK_Sysmpu0 \
     }
 
 /*! @brief Clock ip name array for VREF. */
@@ -445,7 +402,7 @@ typedef enum _clock_ip_name
 
     kCLOCK_Flexbus0 = CLK_GATE_DEFINE(0x1040U, 0U),
     kCLOCK_Dma0 = CLK_GATE_DEFINE(0x1040U, 1U),
-    kCLOCK_Mpu0 = CLK_GATE_DEFINE(0x1040U, 2U),
+    kCLOCK_Sysmpu0 = CLK_GATE_DEFINE(0x1040U, 2U),
 } clock_ip_name_t;
 
 /*!@brief SIM configuration structure for clock setting. */
@@ -709,7 +666,7 @@ extern "C" {
 static inline void CLOCK_EnableClock(clock_ip_name_t name)
 {
     uint32_t regAddr = SIM_BASE + CLK_GATE_ABSTRACT_REG_OFFSET((uint32_t)name);
-    __FSL_CLOCK_SECURE_BITS_SET((volatile uint32_t *) regAddr, (1U << CLK_GATE_ABSTRACT_BITS_SHIFT((uint32_t)name)));
+    (*(volatile uint32_t *)regAddr) |= (1U << CLK_GATE_ABSTRACT_BITS_SHIFT((uint32_t)name));
 }
 
 /*!
@@ -720,7 +677,7 @@ static inline void CLOCK_EnableClock(clock_ip_name_t name)
 static inline void CLOCK_DisableClock(clock_ip_name_t name)
 {
     uint32_t regAddr = SIM_BASE + CLK_GATE_ABSTRACT_REG_OFFSET((uint32_t)name);
-    __FSL_CLOCK_SECURE_BITS_CLEAR((volatile uint32_t *) regAddr, (1U << CLK_GATE_ABSTRACT_BITS_SHIFT((uint32_t)name)));
+    (*(volatile uint32_t *)regAddr) &= ~(1U << CLK_GATE_ABSTRACT_BITS_SHIFT((uint32_t)name));
 }
 
 /*!
@@ -730,7 +687,7 @@ static inline void CLOCK_DisableClock(clock_ip_name_t name)
  */
 static inline void CLOCK_SetEr32kClock(uint32_t src)
 {
-    __FSL_CLOCK_SECURE_BITS_SET_VALUE(&SIM->SOPT1, SIM_SOPT1_OSC32KSEL_MASK, SIM_SOPT1_OSC32KSEL(src));
+    SIM->SOPT1 = ((SIM->SOPT1 & ~SIM_SOPT1_OSC32KSEL_MASK) | SIM_SOPT1_OSC32KSEL(src));
 }
 
 /*!
@@ -740,7 +697,7 @@ static inline void CLOCK_SetEr32kClock(uint32_t src)
  */
 static inline void CLOCK_SetSdhc0Clock(uint32_t src)
 {
-    __FSL_CLOCK_SECURE_BITS_SET_VALUE(&SIM->SOPT2, SIM_SOPT2_SDHCSRC_MASK, SIM_SOPT2_SDHCSRC(src));
+    SIM->SOPT2 = ((SIM->SOPT2 & ~SIM_SOPT2_SDHCSRC_MASK) | SIM_SOPT2_SDHCSRC(src));
 }
 
 /*!
@@ -750,7 +707,7 @@ static inline void CLOCK_SetSdhc0Clock(uint32_t src)
  */
 static inline void CLOCK_SetEnetTime0Clock(uint32_t src)
 {
-    __FSL_CLOCK_SECURE_BITS_SET_VALUE(&SIM->SOPT2, SIM_SOPT2_TIMESRC_MASK, SIM_SOPT2_TIMESRC(src));
+    SIM->SOPT2 = ((SIM->SOPT2 & ~SIM_SOPT2_TIMESRC_MASK) | SIM_SOPT2_TIMESRC(src));
 }
 
 /*!
@@ -760,7 +717,7 @@ static inline void CLOCK_SetEnetTime0Clock(uint32_t src)
  */
 static inline void CLOCK_SetRmii0Clock(uint32_t src)
 {
-    __FSL_CLOCK_SECURE_BITS_SET_VALUE(&SIM->SOPT2, SIM_SOPT2_RMIISRC_MASK, SIM_SOPT2_RMIISRC(src));
+    SIM->SOPT2 = ((SIM->SOPT2 & ~SIM_SOPT2_RMIISRC_MASK) | SIM_SOPT2_RMIISRC(src));
 }
 
 /*!
@@ -770,7 +727,7 @@ static inline void CLOCK_SetRmii0Clock(uint32_t src)
  */
 static inline void CLOCK_SetTraceClock(uint32_t src)
 {
-    __FSL_CLOCK_SECURE_BITS_SET_VALUE(&SIM->SOPT2, SIM_SOPT2_TRACECLKSEL_MASK, SIM_SOPT2_TRACECLKSEL(src));
+    SIM->SOPT2 = ((SIM->SOPT2 & ~SIM_SOPT2_TRACECLKSEL_MASK) | SIM_SOPT2_TRACECLKSEL(src));
 }
 
 /*!
@@ -780,7 +737,7 @@ static inline void CLOCK_SetTraceClock(uint32_t src)
  */
 static inline void CLOCK_SetPllFllSelClock(uint32_t src)
 {
-    __FSL_CLOCK_SECURE_BITS_SET_VALUE(&SIM->SOPT2, SIM_SOPT2_PLLFLLSEL_MASK, SIM_SOPT2_PLLFLLSEL(src));
+    SIM->SOPT2 = ((SIM->SOPT2 & ~SIM_SOPT2_PLLFLLSEL_MASK) | SIM_SOPT2_PLLFLLSEL(src));
 }
 
 /*!
@@ -790,7 +747,7 @@ static inline void CLOCK_SetPllFllSelClock(uint32_t src)
  */
 static inline void CLOCK_SetClkOutClock(uint32_t src)
 {
-    __FSL_CLOCK_SECURE_BITS_SET_VALUE(&SIM->SOPT2, SIM_SOPT2_CLKOUTSEL_MASK, SIM_SOPT2_CLKOUTSEL(src));
+    SIM->SOPT2 = ((SIM->SOPT2 & ~SIM_SOPT2_CLKOUTSEL_MASK) | SIM_SOPT2_CLKOUTSEL(src));
 }
 
 /*!
@@ -800,7 +757,7 @@ static inline void CLOCK_SetClkOutClock(uint32_t src)
  */
 static inline void CLOCK_SetRtcClkOutClock(uint32_t src)
 {
-    __FSL_CLOCK_SECURE_BITS_SET_VALUE(&SIM->SOPT2, SIM_SOPT2_RTCCLKOUTSEL_MASK, SIM_SOPT2_RTCCLKOUTSEL(src));
+    SIM->SOPT2 = ((SIM->SOPT2 & ~SIM_SOPT2_RTCCLKOUTSEL_MASK) | SIM_SOPT2_RTCCLKOUTSEL(src));
 }
 
 /*! @brief Enable USB FS clock.
@@ -836,11 +793,8 @@ static inline void CLOCK_DisableUsbfs0Clock(void)
  */
 static inline void CLOCK_SetOutDiv(uint32_t outdiv1, uint32_t outdiv2, uint32_t outdiv3, uint32_t outdiv4)
 {
-    __FSL_CLOCK_SECURE_WRITE(&SIM->CLKDIV1,
-        SIM_CLKDIV1_OUTDIV1(outdiv1) |
-        SIM_CLKDIV1_OUTDIV2(outdiv2) |
-        SIM_CLKDIV1_OUTDIV3(outdiv3) |
-        SIM_CLKDIV1_OUTDIV4(outdiv4));
+    SIM->CLKDIV1 = SIM_CLKDIV1_OUTDIV1(outdiv1) | SIM_CLKDIV1_OUTDIV2(outdiv2) | SIM_CLKDIV1_OUTDIV3(outdiv3) |
+                   SIM_CLKDIV1_OUTDIV4(outdiv4);
 }
 
 /*!
@@ -933,7 +887,7 @@ void CLOCK_SetSimConfig(sim_clock_config_t const *config);
  */
 static inline void CLOCK_SetSimSafeDivs(void)
 {
-    __FSL_CLOCK_SECURE_WRITE(&SIM->CLKDIV1, 0x01240000UL);
+    SIM->CLKDIV1 = 0x01240000U;
 }
 
 /*! @name MCG frequency functions. */
@@ -1009,11 +963,11 @@ static inline void CLOCK_SetLowPowerEnable(bool enable)
 {
     if (enable)
     {
-        __FSL_CLOCK_SECURE_BITS_SET(&MCG->C2, MCG_C2_LP_MASK);
+        MCG->C2 |= MCG_C2_LP_MASK;
     }
     else
     {
-        __FSL_CLOCK_SECURE_BITS_CLEAR(&MCG->C2, MCG_C2_LP_MASK);
+        MCG->C2 &= ~MCG_C2_LP_MASK;
     }
 }
 
@@ -1029,8 +983,8 @@ static inline void CLOCK_SetLowPowerEnable(bool enable)
  * @param enableMode MCGIRCLK enable mode, OR'ed value of @ref _mcg_irclk_enable_mode.
  * @param ircs       MCGIRCLK clock source, choose fast or slow.
  * @param fcrdiv     Fast IRC divider setting (\c FCRDIV).
- * @retval kStatus_MCG_SourceUsed Because the internall reference clock is used as a clock source,
- * the confuration should not be changed. Otherwise, a glitch occurs.
+ * @retval kStatus_MCG_SourceUsed Because the internal reference clock is used as a clock source,
+ * the configuration should not be changed. Otherwise, a glitch occurs.
  * @retval kStatus_Success MCGIRCLK configuration finished successfully.
  */
 status_t CLOCK_SetInternalRefClkConfig(uint8_t enableMode, mcg_irc_mode_t ircs, uint8_t fcrdiv);
@@ -1044,7 +998,7 @@ status_t CLOCK_SetInternalRefClkConfig(uint8_t enableMode, mcg_irc_mode_t ircs, 
  *
  * @param oscsel MCG external reference clock source, MCG_C7[OSCSEL].
  * @retval kStatus_MCG_SourceUsed Because the external reference clock is used as a clock source,
- * the confuration should not be changed. Otherwise, a glitch occurs.
+ * the configuration should not be changed. Otherwise, a glitch occurs.
  * @retval kStatus_Success External reference clock set successfully.
  */
 status_t CLOCK_SetExternalRefClkConfig(mcg_oscsel_t oscsel);
@@ -1082,7 +1036,7 @@ void CLOCK_EnablePll0(mcg_pll_config_t const *config);
  */
 static inline void CLOCK_DisablePll0(void)
 {
-    __FSL_CLOCK_SECURE_BITS_CLEAR(&MCG->C5, MCG_C5_PLLCLKEN0_MASK | MCG_C5_PLLSTEN0_MASK);
+    MCG->C5 &= ~(MCG_C5_PLLCLKEN0_MASK | MCG_C5_PLLSTEN0_MASK);
 }
 
 /*!
@@ -1455,7 +1409,7 @@ status_t CLOCK_SetPeeMode(void);
  * @brief Switches the MCG to FBE mode from the external mode.
  *
  * This function switches the MCG from external modes (PEE/PBE/BLPE/FEE) to the FBE mode quickly.
- * The external clock is used as the system clock souce and PLL is disabled. However,
+ * The external clock is used as the system clock source and PLL is disabled. However,
  * the FLL settings are not configured. This is a lite function with a small code size, which is useful
  * during the mode switch. For example, to switch from PEE mode to FEI mode:
  *
@@ -1473,7 +1427,7 @@ status_t CLOCK_ExternalModeToFbeModeQuick(void);
  * @brief Switches the MCG to FBI mode from internal modes.
  *
  * This function switches the MCG from internal modes (PEI/PBI/BLPI/FEI) to the FBI mode quickly.
- * The MCGIRCLK is used as the system clock souce and PLL is disabled. However,
+ * The MCGIRCLK is used as the system clock source and PLL is disabled. However,
  * FLL settings are not configured. This is a lite function with a small code size, which is useful
  * during the mode switch. For example, to switch from PEI mode to FEE mode:
  *
@@ -1526,7 +1480,7 @@ status_t CLOCK_BootToFeeMode(
  * @brief Sets the MCG to BLPI mode during system boot up.
  *
  * This function sets the MCG to BLPI mode from the reset mode. It can also be used to
- * set up the MCG during sytem boot up.
+ * set up the MCG during system boot up.
  *
  * @param  fcrdiv Fast IRC divider, FCRDIV.
  * @param  ircs   The internal reference clock to select, IRCS.
@@ -1538,10 +1492,10 @@ status_t CLOCK_BootToFeeMode(
 status_t CLOCK_BootToBlpiMode(uint8_t fcrdiv, mcg_irc_mode_t ircs, uint8_t ircEnableMode);
 
 /*!
- * @brief Sets the MCG to BLPE mode during sytem boot up.
+ * @brief Sets the MCG to BLPE mode during system boot up.
  *
  * This function sets the MCG to BLPE mode from the reset mode. It can also be used to
- * set up the MCG during sytem boot up.
+ * set up the MCG during system boot up.
  *
  * @param  oscsel OSC clock select, MCG_C7[OSCSEL].
  *
