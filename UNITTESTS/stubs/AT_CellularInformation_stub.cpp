@@ -16,7 +16,7 @@
  */
 
 #include "AT_CellularInformation.h"
-#include "nsapi_types.h"
+#include "netsocket/nsapi_types.h"
 
 using namespace mbed;
 
@@ -56,9 +56,4 @@ nsapi_error_t AT_CellularInformation::get_imsi(char *imsi, size_t buf_size)
 nsapi_error_t AT_CellularInformation::get_iccid(char *buf, size_t buf_size)
 {
     return NSAPI_ERROR_OK;
-}
-
-ATHandler &AT_CellularInformation::get_at_handler()
-{
-    return _at;
 }

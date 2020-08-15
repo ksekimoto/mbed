@@ -100,12 +100,8 @@ static void _can_init_freq_direct(can_t *obj, const can_pinmap_t *pinmap, int hz
     pin_function(pinmap->rd_pin, pinmap->rd_function);
     pin_function(pinmap->td_pin, pinmap->td_function);
     // Add pull-ups
-    if (pinmap->rd_pin != NC) {
-        pin_mode(pinmap->rd_pin, PullUp);
-    }
-    if (pinmap->td_pin != NC) {
-        pin_mode(pinmap->td_pin, PullUp);
-    }
+    pin_mode(pinmap->rd_pin, PullUp);
+    pin_mode(pinmap->td_pin, PullUp);
 
     // Default values
     obj->CanHandle.Instance = (FDCAN_GlobalTypeDef *)pinmap->peripheral;
@@ -599,12 +595,8 @@ static void _can_init_freq_direct(can_t *obj, const can_pinmap_t *pinmap, int hz
     pin_function(pinmap->rd_pin, pinmap->rd_function);
     pin_function(pinmap->td_pin, pinmap->td_function);
     // Add pull-ups
-    if (pinmap->rd_pin != NC) {
-        pin_mode(pinmap->rd_pin, PullUp);
-    }
-    if (pinmap->td_pin != NC) {
-        pin_mode(pinmap->td_pin, PullUp);
-    }
+    pin_mode(pinmap->rd_pin, PullUp);
+    pin_mode(pinmap->td_pin, PullUp);
 
     /*  Use default values for rist init */
     obj->CanHandle.Instance = (CAN_TypeDef *)pinmap->peripheral;
@@ -1007,6 +999,8 @@ int can_mode(can_t *obj, CanMode mode)
 
 int can_filter(can_t *obj, uint32_t id, uint32_t mask, CANFormat format, int32_t handle)
 {
+    int success = 0;
+    
     // filter for CANAny format cannot be configured for STM32
     if ((format == CANStandard) || (format == CANExtended)) {
         CAN_FilterConfTypeDef  sFilterConfig;
@@ -1030,10 +1024,13 @@ int can_filter(can_t *obj, uint32_t id, uint32_t mask, CANFormat format, int32_t
         sFilterConfig.FilterActivation = ENABLE;
         sFilterConfig.BankNumber = 14 + handle;
 
-        HAL_CAN_ConfigFilter(&obj->CanHandle, &sFilterConfig);
+        if (HAL_CAN_ConfigFilter(&obj->CanHandle, &sFilterConfig) == HAL_OK)
+        {
+            success = 1;
+        }
     }
 
-    return 1;
+    return success;
 }
 
 static void can_irq(CANName name, int id)

@@ -24,6 +24,8 @@ static USBPhyHw *instance;
 #if defined (TARGET_M451)
 #undef  MBED_CONF_TARGET_USB_DEVICE_HSUSBD
 #define MBED_CONF_TARGET_USB_DEVICE_HSUSBD 0  /* USB 1.1 Only */
+#elif defined (TARGET_M480)
+#define USBD_SET_ADDRESS         0x05ul
 #elif defined (TARGET_M2351) || defined(TARGET_M261)
 #undef  MBED_CONF_TARGET_USB_DEVICE_HSUSBD
 #define MBED_CONF_TARGET_USB_DEVICE_HSUSBD 0  /* USB 1.1 Only */
@@ -127,7 +129,7 @@ void chip_config(void)
 #define HW_TO_DESC(endpoint) (endpoint|(((endpoint&1)?0x0:0x80)))
 
 /* Global variables for Control Pipe */
-#if defined(TARGET_M261)
+#if defined(TARGET_M2351) || defined(TARGET_M261)
 extern uint8_t g_USBD_au8SetupPacket[];        /*!< Setup packet buffer */
 uint8_t* g_usbd_SetupPacket=g_USBD_au8SetupPacket;
 #else

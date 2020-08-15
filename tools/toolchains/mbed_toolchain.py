@@ -2,6 +2,7 @@
 mbed SDK
 SPDX-License-Identifier: Apache-2.0
 Copyright (c) 2011-2013 ARM Limited
+SPDX-License-Identifier: Apache-2.0
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -132,7 +133,7 @@ class mbedToolchain(with_metaclass(ABCMeta, object)):
     profile_template = {'common': [], 'c': [], 'cxx': [], 'asm': [], 'ld': []}
 
     def __init__(self, target, notify=None, macros=None, build_profile=None,
-                 build_dir=None):
+                 build_dir=None, coverage_patterns=None):
         self.target = target
         self.name = self.__class__.__name__
 
@@ -189,6 +190,9 @@ class mbedToolchain(with_metaclass(ABCMeta, object)):
 
         # Used by the mbed Online Build System to build in chrooted environment
         self.CHROOT = None
+
+        self.coverage_supported = False
+        self.coverage_patterns = coverage_patterns
 
         # post-init hook used by the online compiler TODO: remove this.
         self.init()
@@ -648,7 +652,7 @@ class mbedToolchain(with_metaclass(ABCMeta, object)):
 
     @abstractmethod
     def parse_output(self, output):
-        """Take in compiler output and extract sinlge line warnings and errors from it.
+        """Take in compiler output and extract single line warnings and errors from it.
 
         Positional arguments:
         output -- a string of all the messages emitted by a run of the compiler
@@ -774,14 +778,15 @@ class mbedToolchain(with_metaclass(ABCMeta, object)):
             self.link(elf, objects, libraries, lib_dirs, linker_script)
 
         if self.config.has_regions:
-            filename = "{}_application.{}".format(tail, ext)
+            stem = join(new_path, "{}_application".format(tail))
         else:
-            filename = "{}.{}".format(tail, ext)
-        full_path = join(new_path, filename)
+            stem = join(new_path, tail)
+        full_path = "{}.{}".format(stem, ext)
         if ext != 'elf':
             if full_path and self.need_update(full_path, [elf]):
                 self.progress("elf2bin", tail)
-                self.binary(r, elf, full_path)
+                self.binary(r, elf, "{}.{}".format(stem, 'bin'))
+                self.binary(r, elf, "{}.{}".format(stem, 'hex'))
             if self.config.has_regions:
                 full_path, updatable = self._do_region_merge(
                     tail, full_path, ext
@@ -895,10 +900,6 @@ class mbedToolchain(with_metaclass(ABCMeta, object)):
     def add_regions(self):
         """Add regions to the build profile, if there are any.
         """
-
-        if not getattr(self.target, "bootloader_supported", False):
-            return
-
         if self.config.has_regions:
             try:
                 regions = list(self.config.regions)
@@ -989,15 +990,6 @@ class mbedToolchain(with_metaclass(ABCMeta, object)):
             )
             self.ld.append(define_string)
             self.flags["ld"].append(define_string)
-
-        if self.target.is_PSA_secure_target:
-            for flag, param in [
-                ("MBED_PUBLIC_RAM_START", "target.public-ram-start"),
-                ("MBED_PUBLIC_RAM_SIZE", "target.public-ram-size")
-            ]:
-                define_string = self.make_ld_define(flag, params[param].value)
-                self.ld.append(define_string)
-                self.flags["ld"].append(define_string)
 
         if hasattr(self.target, 'post_binary_hook'):
             if self.target.post_binary_hook is None:
@@ -1103,18 +1095,23 @@ class mbedToolchain(with_metaclass(ABCMeta, object)):
         """
         Check and raise an exception if the requested C library is not supported,
 
-        target.default_lib is modified to have the lowercased string of its original string.
+        target.c_lib is modified to have the lowercased string of its original string.
         This is done to be case insensitive when validating.
         """
-        if  hasattr(target, "default_lib"):
-            target.default_lib = target.default_lib.lower()
+        if hasattr(target, "default_lib"):
+            # Use default_lib as the c_lib attribute. This allows backwards
+            # compatibility with older target definitions, allowing either
+            # default_lib or c_lib to specify the C library to use.
+            target.c_lib = target.default_lib.lower()
+        if hasattr(target, "c_lib"):
+            target.c_lib = target.c_lib.lower()
             if (
                 hasattr(target, "supported_c_libs") == False
                 or toolchain not in target.supported_c_libs
-                or target.default_lib not in target.supported_c_libs[toolchain]
+                or target.c_lib not in target.supported_c_libs[toolchain]
             ):
                 raise NotSupportedException(
-                   UNSUPPORTED_C_LIB_EXCEPTION_STRING.format(target.default_lib)
+                   UNSUPPORTED_C_LIB_EXCEPTION_STRING.format(target.c_lib)
                 )
 
     @staticmethod
@@ -1389,3 +1386,28 @@ class mbedToolchain(with_metaclass(ABCMeta, object)):
         to_ret['linker'] = {'flags': copy(self.flags['ld'])}
         to_ret.update(self.config.report)
         return to_ret
+
+def should_replace_small_c_lib(target, toolchain):
+    """
+    Check if the small C lib should be replaced with the standard C lib.
+    Return True if the replacement occurs otherwise return False.
+    """
+    return (
+        not is_library_supported("small", target, toolchain)
+        and is_library_supported("std", target, toolchain)
+        and target.c_lib == "small"
+    )
+
+
+def is_library_supported(lib_type, target, toolchain):
+    """
+    Check if a library type is supported by a toolchain for a given target.
+
+    Return True if the library type is supported, False if not supported or
+    the target does not have an supported_c_libs attribute.
+    """
+    return (
+        hasattr(target, "supported_c_libs")
+        and toolchain.lower() in target.supported_c_libs
+        and lib_type in target.supported_c_libs[toolchain.lower()]
+    )

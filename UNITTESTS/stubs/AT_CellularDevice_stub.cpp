@@ -31,8 +31,11 @@ int AT_CellularDevice_stub::set_pin_failure_count = 0;
 int AT_CellularDevice_stub::get_sim_failure_count = 0;
 bool AT_CellularDevice_stub::pin_needed = false;
 bool AT_CellularDevice_stub::supported_bool = false;
+int AT_CellularDevice_stub::max_sock_value = 1;
 
-AT_CellularDevice::AT_CellularDevice(FileHandle *fh) : CellularDevice(fh),
+AT_CellularDevice::AT_CellularDevice(FileHandle *fh) :
+    CellularDevice(),
+    _at(fh, _queue, get_property(AT_CellularDevice::PROPERTY_AT_SEND_DELAY), "\r"),
 #if MBED_CONF_CELLULAR_USE_SMS
     _sms(0),
 #endif // MBED_CONF_CELLULAR_USE_SMS
@@ -46,31 +49,12 @@ AT_CellularDevice::~AT_CellularDevice()
     close_network();
 }
 
-ATHandler *AT_CellularDevice::get_at_handler(FileHandle *fileHandle)
-{
-    return ATHandler::get_instance(fileHandle, _queue, _default_timeout, "\r", get_send_delay(), _modem_debug_on);
-}
-
 ATHandler *AT_CellularDevice::get_at_handler()
 {
-    return get_at_handler(NULL);
+    return &_at;
 }
 
-nsapi_error_t AT_CellularDevice::release_at_handler(ATHandler *at_handler)
-{
-    if (at_handler) {
-        return at_handler->close();
-    } else {
-        return NSAPI_ERROR_PARAMETER;
-    }
-}
-
-CellularContext *AT_CellularDevice::create_context(UARTSerial *serial, const char *const apn, PinName dcd_pin,
-                                                   bool active_high, bool cp_req, bool nonip_req)
-{
-}
-
-CellularContext *create_context(FileHandle *fh, const char *apn)
+CellularContext *create_context(const char *apn)
 {
 }
 
@@ -78,21 +62,16 @@ void delete_context(CellularContext *context)
 {
 }
 
-CellularNetwork *AT_CellularDevice::open_network(FileHandle *fh)
+CellularNetwork *AT_CellularDevice::open_network()
 {
     if (_network) {
         return _network;
     }
-    _network = new AT_CellularNetwork(*ATHandler::get_instance(fh,
-                                                               _queue,
-                                                               _default_timeout,
-                                                               "\r",
-                                                               get_send_delay(),
-                                                               _modem_debug_on), *this);
+    _network = new AT_CellularNetwork(_at, *this);
     return _network;
 }
 #if MBED_CONF_CELLULAR_USE_SMS
-CellularSMS *AT_CellularDevice::open_sms(FileHandle *fh)
+CellularSMS *AT_CellularDevice::open_sms()
 {
     return NULL;
 }
@@ -108,7 +87,7 @@ AT_CellularSMS *AT_CellularDevice::open_sms_impl(ATHandler &at)
 
 #endif // MBED_CONF_CELLULAR_USE_SMS
 
-CellularInformation *AT_CellularDevice::open_information(FileHandle *fh)
+CellularInformation *AT_CellularDevice::open_information()
 {
     return NULL;
 }
@@ -116,10 +95,8 @@ CellularInformation *AT_CellularDevice::open_information(FileHandle *fh)
 void AT_CellularDevice::close_network()
 {
     if (_network) {
-        ATHandler *atHandler = &_network->get_at_handler();
         delete _network;
         _network = NULL;
-        release_at_handler(atHandler);
     }
 }
 
@@ -132,7 +109,7 @@ CellularContext *AT_CellularDevice::get_context_list() const
     return NULL;
 }
 
-CellularContext *AT_CellularDevice::create_context(FileHandle *fh, const char *apn, bool cp_req, bool nonip_req)
+CellularContext *AT_CellularDevice::create_context(const char *apn, bool cp_req, bool nonip_req)
 {
     return NULL;
 }
@@ -160,12 +137,7 @@ AT_CellularInformation *AT_CellularDevice::open_information_impl(ATHandler &at)
 
 void AT_CellularDevice::set_timeout(int timeout)
 {
-    _default_timeout = timeout;
-}
-
-uint16_t AT_CellularDevice::get_send_delay() const
-{
-    return 0;
+    _default_timeout = std::chrono::duration<int, std::milli>(timeout);
 }
 
 void AT_CellularDevice::modem_debug_on(bool on)
@@ -293,6 +265,8 @@ intptr_t AT_CellularDevice::get_property(CellularProperty key)
         return true;
     } else if (key == PROPERTY_IPV4_PDP_TYPE) {
         return true;
+    } else if (key == PROPERTY_SOCKET_COUNT) {
+        return AT_CellularDevice_stub::max_sock_value;
     }
 
     return AT_CellularDevice_stub::supported_bool;

@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2019 ARM Limited
+ * SPDX-License-Identifier: MIT
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,6 +25,9 @@
 
 #include <stdint.h>
 #include "cmsis_os.h"
+#include "platform/Callback.h"
+
+#define OS_STACK_SIZE 0
 
 namespace rtos {
 
@@ -42,12 +46,10 @@ public:
     {
     }
 
-    osStatus start(mbed::Callback<void()> task) {
-      return 0;
-    }
+    osStatus start(mbed::Callback<void()> task);
 
     osStatus join() {return 0;};
-    osStatus terminate(){return 0;};
+    osStatus terminate();
     osStatus set_priority(osPriority priority){return 0;};
     osPriority get_priority() const{return osPriorityNormal;};
     uint32_t flags_set(uint32_t flags){return 0;};
@@ -96,6 +98,14 @@ public:
     osThreadId_t get_id() const {
       return 0;
     };
+    virtual ~Thread();
+private:
+    // Required to share definitions without
+    // delegated constructors
+    void constructor(osPriority priority = osPriorityNormal,
+                     uint32_t stack_size = OS_STACK_SIZE,
+                     unsigned char *stack_mem = nullptr,
+                     const char *name = nullptr);
 };
 }
 #endif

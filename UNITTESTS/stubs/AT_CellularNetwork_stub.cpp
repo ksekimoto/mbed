@@ -20,7 +20,7 @@
 #include "CellularUtil.h"
 #include "CellularLog.h"
 #include "FileHandle.h"
-#include "nsapi_types.h"
+#include "netsocket/nsapi_types.h"
 
 using namespace mbed;
 using namespace mbed_cellular_util;
@@ -170,9 +170,4 @@ nsapi_error_t AT_CellularNetwork::set_packet_domain_event_reporting(bool on)
 nsapi_error_t AT_CellularNetwork::clear()
 {
     return NSAPI_ERROR_OK;
-}
-
-ATHandler &AT_CellularNetwork::get_at_handler()
-{
-    return _at;
 }

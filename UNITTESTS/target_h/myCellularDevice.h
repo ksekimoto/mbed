@@ -23,7 +23,7 @@
 #include "ATHandler_stub.h"
 #include "AT_CellularContext.h"
 #include "gtest/gtest.h"
-#include "UARTSerial.h"
+#include "drivers/BufferedSerial.h"
 
 using namespace events;
 
@@ -53,19 +53,8 @@ public:
         return NSAPI_ERROR_OK;
     }
 
-    virtual CellularContext *create_context(UARTSerial *serial, const char *const apn, PinName dcd_pin,
-                                            bool active_high, bool cp_req = false, bool nonip_req = false)
-    {
-        if (_context_list) {
-            return _context_list;
-        }
-        EventQueue que;
-        ATHandler at(serial, que, 0, ",");
-        _context_list = new AT_CellularContext(at, this);
-        return _context_list;
-    }
 
-    virtual CellularContext *create_context(FileHandle *fh = NULL, const char *apn = NULL, bool cp_req = false, bool nonip_req = false)
+    virtual CellularContext *create_context(const char *apn = NULL, bool cp_req = false, bool nonip_req = false)
     {
         if (_context_list) {
             return _context_list;
@@ -82,7 +71,7 @@ public:
         delete _context_list;
     }
 
-    virtual CellularNetwork *open_network(FileHandle *fh = NULL)
+    virtual CellularNetwork *open_network()
     {
         if (_network) {
             return _network;
@@ -94,12 +83,12 @@ public:
         return _network;
     }
 
-    virtual CellularSMS *open_sms(FileHandle *fh = NULL)
+    virtual CellularSMS *open_sms()
     {
         return NULL;
     }
 
-    virtual CellularInformation *open_information(FileHandle *fh = NULL)
+    virtual CellularInformation *open_information()
     {
         return NULL;
     }
@@ -114,11 +103,6 @@ public:
     virtual void close_information() {}
 
     virtual void set_timeout(int timeout) {}
-
-    virtual uint16_t get_send_delay() const
-    {
-        return 0;
-    }
 
     virtual void modem_debug_on(bool on) {}
 

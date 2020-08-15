@@ -20,10 +20,6 @@
  * freqency is valid.
  */
 
-#if !defined(MBED_CONF_RTOS_PRESENT)
-#error [NOT_SUPPORTED] common tickers frequency test cases require a RTOS to run.
-#else
-
 #include "mbed.h"
 #include "greentea-client/test_env.h"
 #include "utest/utest.h"
@@ -33,9 +29,13 @@
 #include "hal/lp_ticker_api.h"
 #include "hal/mbed_lp_ticker_wrapper.h"
 
-#if defined(SKIP_TIME_DRIFT_TESTS) || !DEVICE_USTICKER
-#error [NOT_SUPPORTED] test not supported
+#if !DEVICE_USTICKER
+#error [NOT_SUPPORTED] UsTicker need to be enabled for this test
 #else
+
+#if defined(SKIP_TIME_DRIFT_TESTS)
+#error [NOT_SUPPORTED] timing accuracy tests skipped
+#endif // defined(SKIP_TIME_DRIFT_TESTS)
 
 #define US_PER_S 1000000
 
@@ -187,8 +187,10 @@ Case cases[] = {
 
 utest::v1::status_t greentea_test_setup(const size_t number_of_cases)
 {
+#ifdef MBED_CONF_RTOS_PRESENT
     /* Suspend RTOS Kernel so the timers are not in use. */
     osKernelSuspend();
+#endif
 
     GREENTEA_SETUP(120, "timing_drift_auto");
     return greentea_test_setup_handler(number_of_cases);
@@ -196,7 +198,9 @@ utest::v1::status_t greentea_test_setup(const size_t number_of_cases)
 
 void greentea_test_teardown(const size_t passed, const size_t failed, const failure_t failure)
 {
+#ifdef MBED_CONF_RTOS_PRESENT
     osKernelResume(0);
+#endif
 
     greentea_test_teardown_handler(passed, failed, failure);
 }
@@ -208,5 +212,4 @@ int main()
     Harness::run(specification);
 }
 
-#endif // defined(SKIP_TIME_DRIFT_TESTS) || !DEVICE_USTICKER
-#endif // !defined(MBED_CONF_RTOS_PRESENT)
+#endif // !DEVICE_USTICKER

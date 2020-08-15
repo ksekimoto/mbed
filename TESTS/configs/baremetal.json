@@ -1,16 +1,18 @@
 {
     "requires": [
         "bare-metal",
-        "rtos-api",
         "greentea-client",
         "utest",
         "unity",
         "psa",
-        "mbed-crypto",
+        "psa-services",
         "mbedtls",
+        "mbedtls-stm",
+        "mbedtls-nuvoton",
         "psa-compliance-framework",
         "filesystem",
         "littlefs",
+        "littlefs2",
         "mbed-trace",
         "device_key",
         "storage_tdb_internal",
@@ -22,39 +24,22 @@
         "network-emac",
         "flashiap-block-device",
         "system-storage",
-        "filesystemstore",
         "SecureStore",
         "storage",
-        "kv-map",
+        "kv-global-api",
         "direct-access-devicekey",
-        "tdbstore",
         "kv-config",
         "events",
-        "kv-global-api",
         "sd",
-        "qspif"
+        "qspif",
+        "spif-driver",
+        "cryptocell310",
+        "drivers-usb"
     ],
     "target_overrides": {
         "*": {
-            "mbed-trace.fea-ipv6": false
-        },
-        "K64F": {
-            "target.default_lib": "small"
-        },
-        "K66F": {
-            "target.default_lib": "small"
-        },
-        "NUCLEO_F303RE": {
-            "target.default_lib": "small"
-        },
-        "NUCLEO_F411RE": {
-            "target.default_lib": "small"
-        },
-        "NUCLEO_F429ZI": {
-            "target.default_lib": "small"
-        },
-        "DISCO_L475VG_IOT01A": {
-            "target.default_lib": "small"
+            "mbed-trace.fea-ipv6": false,
+            "target.c_lib": "small"
         }
      }
 }

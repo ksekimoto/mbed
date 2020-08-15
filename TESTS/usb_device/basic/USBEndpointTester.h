@@ -21,7 +21,7 @@
 /* These headers are included for child class. */
 #include "USBDescriptor.h"
 #include "USBDevice_Types.h"
-#include "EventQueue.h"
+#include "events/EventQueue.h"
 #include "EventFlags.h"
 #include "platform/NonCopyable.h"
 
@@ -79,7 +79,6 @@ public:
     };
 
 protected:
-    events::EventQueue *queue;
     rtos::EventFlags flags;
     uint8_t *ctrl_buf;
 
